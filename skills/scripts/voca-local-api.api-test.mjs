@@ -230,3 +230,66 @@ test("v1 practice attempts sync appends attempt records", async () => {
     assert.deepEqual(record.contextScope.cardIds, ["proposition"]);
   });
 });
+
+test("v1 API deletes a card and its assets", async () => {
+  await withApiServer(async ({ origin, root, token }) => {
+    // Create dummy audio file to test deletion
+    const audioDir = path.join(root, "audio", "voice_test");
+    await mkdir(audioDir, { recursive: true });
+    const audioPath = path.join(audioDir, "proposition-hash.mp3");
+    await writeFile(audioPath, "mp3");
+
+    // Call DELETE /v1/cards/proposition
+    const response = await fetch(`${origin}/v1/cards/proposition`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+    assert.equal(payload.success, true);
+
+    // Verify deleted from cards.json
+    const cards = JSON.parse(await readFile(path.join(root, "cards.json"), "utf8"));
+    assert.equal(cards.length, 0);
+
+    // Verify PNG is deleted
+    const pngExists = await readFile(path.join(root, "cards", "proposition.png")).then(() => true).catch(() => false);
+    assert.equal(pngExists, false);
+
+    // Verify MP3 is deleted
+    const mp3Exists = await readFile(audioPath).then(() => true).catch(() => false);
+    assert.equal(mp3Exists, false);
+  });
+});
+
+test("v1 API clears all cards and assets", async () => {
+  await withApiServer(async ({ origin, root, token }) => {
+    // Create dummy audio file to test deletion
+    const audioDir = path.join(root, "audio", "voice_test");
+    await mkdir(audioDir, { recursive: true });
+    const audioPath = path.join(audioDir, "proposition-hash.mp3");
+    await writeFile(audioPath, "mp3");
+
+    // Call DELETE /v1/cards
+    const response = await fetch(`${origin}/v1/cards`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+    assert.equal(payload.success, true);
+
+    // Verify cards.json is empty list
+    const cards = JSON.parse(await readFile(path.join(root, "cards.json"), "utf8"));
+    assert.equal(cards.length, 0);
+
+    // Verify PNG is deleted
+    const pngExists = await readFile(path.join(root, "cards", "proposition.png")).then(() => true).catch(() => false);
+    assert.equal(pngExists, false);
+
+    // Verify MP3 is deleted
+    const mp3Exists = await readFile(audioPath).then(() => true).catch(() => false);
+    assert.equal(mp3Exists, false);
+  });
+});
+

@@ -22,6 +22,7 @@ import {
   Settings,
   Sparkles,
   Sun,
+  Trash2,
   Volume2,
   X,
 } from "lucide-react";
@@ -1607,6 +1608,30 @@ export function App() {
         console.error("[voca] bridge level sync failed (cards.json unchanged):", err);
       });
   };
+  const deleteCard = (card: Card) => {
+    const bridgeOrigin = resolvedLocalBridgeOrigin(settings.localBridgeOrigin);
+    const cardId = String(card.slug || slugify(card.word)).trim() || cardKey(card);
+    fetch(`${bridgeOrigin}/v1/cards/${encodeURIComponent(cardId)}`, {
+      method: "DELETE",
+      headers: {
+        ...bridgeAuthorizationHeader(settings.bridgeApiToken),
+      },
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        return res.json();
+      })
+      .then(() => {
+        setSelectedKey(null);
+        setChatOpen(false);
+        void refresh();
+      })
+      .catch((err) => {
+        console.error("[voca] delete card failed:", err);
+        alert(err instanceof Error ? err.message : "Failed to delete card");
+      });
+  };
+
 
   const startResize = (splitter: "list" | "preview", event: ReactPointerEvent) => {
     event.preventDefault();
@@ -1741,6 +1766,7 @@ export function App() {
           card={selected}
           manifestSource={manifest?.source || "legacy"}
           onLevelChange={(level) => setCardLevel(selected, level)}
+          onDeleteCard={deleteCard}
           settings={settings}
           onClose={() => {
             setSelectedKey(null);
@@ -1835,6 +1861,38 @@ function AppSettingsPanel({
   const [filledCount, setFilledCount] = useState(0);
   const [totalToFill, setTotalToFill] = useState(0);
   const [fillingStatus, setFillingStatus] = useState<string | null>(null);
+
+  const [confirmingClearAll, setConfirmingClearAll] = useState(false);
+  const [clearAllInput, setClearAllInput] = useState("");
+  const [clearingAll, setClearingAll] = useState(false);
+
+  const handleClearAll = async () => {
+    if (clearAllInput !== "CLEAR ALL" || clearingAll) return;
+    setClearingAll(true);
+    const bridgeOrigin = resolvedLocalBridgeOrigin(settings.localBridgeOrigin);
+    try {
+      const response = await fetch(`${bridgeOrigin}/v1/cards`, {
+        method: "DELETE",
+        headers: {
+          ...bridgeAuthorizationHeader(settings.bridgeApiToken),
+        },
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.error?.message || `DELETE failed with status ${response.status}`);
+      }
+      setConfirmingClearAll(false);
+      setClearAllInput("");
+      onRefresh();
+      alert("Đã xóa toàn bộ từ vựng thành công!");
+    } catch (err) {
+      console.error("[voca] clear all cards failed:", err);
+      alert(err instanceof Error ? err.message : "Failed to clear all vocabulary");
+    } finally {
+      setClearingAll(false);
+    }
+  };
+
 
   const missingCards = useMemo(() => {
     return cards.filter((card) => !card.meaningVi || !card.meaningEn);
@@ -2251,6 +2309,86 @@ ${batch.map((c) => `- Word: "${c.word}", Part of speech: "${c.partOfSpeech}", To
               </p>
             ) : null}
           </section>
+
+          <section className="app-settings-section danger-zone-section" style={{ borderTop: "1px dashed var(--danger-ink, #dc2626)", paddingTop: "16px", marginTop: "24px" }}>
+            <div className="settings-section-title-row">
+              <h3 style={{ color: "var(--danger-ink, #dc2626)" }}>Danger Zone</h3>
+            </div>
+            <p className="chat-notice" style={{ marginTop: 0 }}>
+              Hành động này sẽ xóa vĩnh viễn toàn bộ từ vựng, hình ảnh và âm thanh đã lưu. Không thể khôi phục dữ liệu sau khi xóa.
+            </p>
+            <div className="settings-test-row" style={{ marginTop: 12 }}>
+              {confirmingClearAll ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", width: "100%" }}>
+                  <label htmlFor="clear-all-confirm-input" style={{ fontSize: "13px", fontWeight: "normal", color: "var(--muted)", textTransform: "none", letterSpacing: "normal" }}>
+                    Nhập <strong style={{ color: "var(--danger-ink, #dc2626)" }}>CLEAR ALL</strong> để xác nhận:
+                  </label>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <input
+                      id="clear-all-confirm-input"
+                      type="text"
+                      value={clearAllInput}
+                      onChange={(e) => setClearAllInput(e.target.value)}
+                      placeholder="CLEAR ALL"
+                      style={{ flex: 1, borderColor: "var(--danger-ink, #dc2626)" }}
+                    />
+                    <button
+                      type="button"
+                      disabled={clearAllInput !== "CLEAR ALL" || clearingAll}
+                      onClick={handleClearAll}
+                      style={{
+                        backgroundColor: clearAllInput === "CLEAR ALL" ? "var(--danger-ink, #dc2626)" : "transparent",
+                        color: clearAllInput === "CLEAR ALL" ? "#fff" : "var(--muted)",
+                        borderColor: clearAllInput === "CLEAR ALL" ? "var(--danger-ink, #dc2626)" : "var(--line)",
+                        padding: "8px 16px",
+                        cursor: clearAllInput === "CLEAR ALL" ? "pointer" : "not-allowed",
+                        fontWeight: "bold",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px"
+                      }}
+                    >
+                      {clearingAll ? <Loader2 className="spin" /> : null}
+                      Xác nhận xóa
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirmingClearAll(false);
+                        setClearAllInput("");
+                      }}
+                      style={{
+                        backgroundColor: "transparent",
+                        border: "1px solid var(--line)",
+                        padding: "8px 16px",
+                        cursor: "pointer"
+                      }}
+                    >
+                      Hủy
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmingClearAll(true)}
+                  style={{
+                    backgroundColor: "transparent",
+                    color: "var(--danger-ink, #dc2626)",
+                    border: "1px solid var(--danger-ink, #dc2626)",
+                    padding: "8px 16px",
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}
+                >
+                  Xóa tất cả từ vựng
+                </button>
+              )}
+            </div>
+          </section>
         </form>
       </section>
     </div>
@@ -2621,6 +2759,7 @@ function CardPreview({
   card,
   manifestSource,
   onLevelChange,
+  onDeleteCard,
   settings,
   onClose,
   onOpenChat,
@@ -2628,10 +2767,12 @@ function CardPreview({
   card: Card;
   manifestSource: "legacy" | "versioned";
   onLevelChange: (level: CardLevel) => void;
+  onDeleteCard?: (card: Card) => void;
   settings: AiSettings;
   onClose: () => void;
   onOpenChat: () => void;
 }) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const src = imagePath(card.file);
   return (
     <section className="drawer preview-drawer open" aria-label="Vocabulary preview">
@@ -2671,19 +2812,58 @@ function CardPreview({
             </div>
           ) : null}
         </div>
-        <div className="viewer-actions">
-          <a className="icon-button" href={src} target="_blank" rel="noreferrer" aria-label="Open PNG" title="Open PNG">
-            <ExternalLink />
-          </a>
-          <a className="icon-button primary" href={src} download={card.file} aria-label="Download PNG" title="Download PNG">
-            <Download />
-          </a>
-          <button className="icon-button" type="button" onClick={onOpenChat} aria-label="Ask AI" title="Ask AI">
-            <Sparkles />
-          </button>
-          <button className="icon-button" type="button" onClick={onClose} aria-label="Close preview" title="Close preview">
-            <X />
-          </button>
+        <div className="viewer-actions" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          {confirmingDelete ? (
+            <div className="delete-confirm-row" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <span style={{ fontSize: "12px", color: "var(--danger-ink, #dc2626)", fontWeight: "bold" }}>Xóa từ này?</span>
+              <button
+                className="icon-button"
+                type="button"
+                style={{ height: "36px", minHeight: "36px", width: "auto", padding: "0 10px", borderColor: "var(--danger-ink, #dc2626)", color: "var(--danger-ink, #dc2626)" }}
+                onClick={() => {
+                  if (onDeleteCard) onDeleteCard(card);
+                  setConfirmingDelete(false);
+                }}
+              >
+                Xóa
+              </button>
+              <button
+                className="icon-button"
+                type="button"
+                style={{ height: "36px", minHeight: "36px", width: "auto", padding: "0 10px" }}
+                onClick={() => setConfirmingDelete(false)}
+              >
+                Hủy
+              </button>
+            </div>
+          ) : (
+            <>
+              {onDeleteCard && (
+                <button
+                  className="icon-button delete-button"
+                  type="button"
+                  onClick={() => setConfirmingDelete(true)}
+                  aria-label="Delete vocabulary"
+                  title="Delete vocabulary"
+                  style={{ color: "var(--danger-ink, #dc2626)", borderColor: "color-mix(in srgb, var(--danger-ink, #dc2626) 30%, transparent)" }}
+                >
+                  <Trash2 />
+                </button>
+              )}
+              <a className="icon-button" href={src} target="_blank" rel="noreferrer" aria-label="Open PNG" title="Open PNG">
+                <ExternalLink />
+              </a>
+              <a className="icon-button primary" href={src} download={card.file} aria-label="Download PNG" title="Download PNG">
+                <Download />
+              </a>
+              <button className="icon-button" type="button" onClick={onOpenChat} aria-label="Ask AI" title="Ask AI">
+                <Sparkles />
+              </button>
+              <button className="icon-button" type="button" onClick={onClose} aria-label="Close preview" title="Close preview">
+                <X />
+              </button>
+            </>
+          )}
         </div>
       </header>
       <div className="image-stage">

@@ -511,6 +511,132 @@ async function handleV1PatchCardLevel(request, response, cardId) {
   sendJson(request, response, 200, { manifestVersion: updated.manifestVersion, card });
 }
 
+async function deleteCachedAudioForCard(card) {
+  const readable = safeSegment(card.word).slice(0, 48);
+  if (!readable) return;
+  async function walk(directory) {
+    let entries;
+    try {
+      entries = await fs.readdir(directory, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const filePath = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        await walk(filePath);
+      } else if (entry.isFile() && entry.name.endsWith(".mp3") && entry.name.startsWith(readable)) {
+        try {
+          await fs.unlink(filePath);
+        } catch (err) {
+          console.warn(`[voca] Failed to delete audio file: ${filePath}`, err);
+        }
+      }
+    }
+  }
+  await walk(AUDIO_DIR);
+}
+
+async function handleV1DeleteCard(request, response, cardId) {
+  const manifest = await readManifestFile();
+  const normalized = slugify(cardId);
+  const index = manifest.cards.findIndex((item) => {
+    const card = normalizeManifestCard(item);
+    return card.id === cardId || card.slug === cardId || card.slug === normalized || card.word.toLowerCase() === String(cardId).toLowerCase();
+  });
+  if (index < 0) {
+    sendApiError(request, response, 404, "CARD_NOT_FOUND", "Card not found.", { id: cardId });
+    return;
+  }
+  const deletedCard = normalizeManifestCard(manifest.cards[index]);
+  
+  // Remove from array
+  manifest.cards.splice(index, 1);
+  await writeManifestCards(manifest.cards);
+  
+  // Clean up image file
+  if (deletedCard.file) {
+    const imgPath = path.resolve(CARDS_DIR, deletedCard.file);
+    if (isResolvedPathInsideDirectory(CARDS_DIR, imgPath)) {
+      try {
+        if (fsSync.existsSync(imgPath)) {
+          await fs.unlink(imgPath);
+        }
+      } catch (err) {
+        console.warn(`[voca] Failed to delete card image: ${imgPath}`, err);
+      }
+    }
+  }
+  
+  // Clean up audio files
+  await deleteCachedAudioForCard(deletedCard);
+  
+  const updated = await readNormalizedManifest();
+  sendJson(request, response, 200, { manifestVersion: updated.manifestVersion, success: true });
+}
+
+async function clearAllCardImages() {
+  let entries;
+  try {
+    entries = await fs.readdir(CARDS_DIR, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (entry.isFile() && entry.name.endsWith(".png")) {
+      const filePath = path.join(CARDS_DIR, entry.name);
+      try {
+        await fs.unlink(filePath);
+      } catch (err) {
+        console.warn(`[voca] Failed to delete card image: ${filePath}`, err);
+      }
+    }
+  }
+}
+
+async function clearAllCachedAudio() {
+  async function walk(directory) {
+    let entries;
+    try {
+      entries = await fs.readdir(directory, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const filePath = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        await walk(filePath);
+        try {
+          const subEntries = await fs.readdir(filePath);
+          if (subEntries.length === 0) {
+            await fs.rmdir(filePath);
+          }
+        } catch {}
+      } else if (entry.isFile() && entry.name.endsWith(".mp3")) {
+        try {
+          await fs.unlink(filePath);
+        } catch (err) {
+          console.warn(`[voca] Failed to delete audio: ${filePath}`, err);
+        }
+      }
+    }
+  }
+  await walk(AUDIO_DIR);
+}
+
+async function handleV1ClearAllCards(request, response) {
+  // Empty manifest
+  await writeManifestCards([]);
+  
+  // Delete all image and audio files
+  await clearAllCardImages();
+  await clearAllCachedAudio();
+  
+  const updated = await readNormalizedManifest();
+  sendJson(request, response, 200, { manifestVersion: updated.manifestVersion, success: true });
+}
+
+
 async function handleV1CardAsset(request, response, file) {
   const filePath = path.resolve(CARDS_DIR, file);
   if (!filePath.endsWith(".png") || !isResolvedPathInsideDirectory(CARDS_DIR, filePath)) {
@@ -933,9 +1059,17 @@ async function handleV1Request(request, response, url) {
     await handleV1Cards(request, response, url);
     return;
   }
+  if (request.method === "DELETE" && pathname === "/v1/cards") {
+    await handleV1ClearAllCards(request, response);
+    return;
+  }
   const cardMatch = pathname.match(/^\/v1\/cards\/([^/]+)$/);
   if (cardMatch && request.method === "GET") {
     await handleV1CardById(request, response, cardMatch[1]);
+    return;
+  }
+  if (cardMatch && request.method === "DELETE") {
+    await handleV1DeleteCard(request, response, cardMatch[1]);
     return;
   }
   const levelMatch = pathname.match(/^\/v1\/cards\/([^/]+)\/level$/);
