@@ -1,0 +1,4 @@
+interface:
+  display_name: "Voca"
+  short_description: "Create printable TOEIC vocabulary cards"
+  default_prompt: "Use $voca to create printable PNG vocabulary cards for these words: dispute, outreach, hesitate."

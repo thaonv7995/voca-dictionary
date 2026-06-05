@@ -1,0 +1,11 @@
+.DS_Store
+node_modules
+dist
+__pycache__
+*.log
+output/
+.voca-output/
+cards/
+cards.json
+audio/
+macos/VocaMenuBar/.build

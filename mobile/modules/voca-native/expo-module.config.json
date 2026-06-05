@@ -1,0 +1,11 @@
+{
+  "name": "VocaNative",
+  "platforms": [
+    "ios"
+  ],
+  "ios": {
+    "modules": [
+      "VocaNativeModule"
+    ]
+  }
+}

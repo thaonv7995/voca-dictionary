@@ -1,0 +1,301 @@
+:root {
+  --bg: #f8fafc;
+  --bg-gradient: radial-gradient(circle at 100% 0%, rgba(37, 99, 235, 0.06) 0%, transparent 50%),
+                 radial-gradient(circle at 0% 100%, rgba(99, 102, 241, 0.04) 0%, transparent 40%),
+                 #f8fafc;
+  --panel: #ffffff;
+  --panel-soft: #f1f5f9;
+  --ink: #0f172a;
+  --muted: #64748b;
+  --line: #e2e8f0;
+  --line-strong: #cbd5e1;
+  --accent: #2563eb;
+  --accent-gradient: linear-gradient(135deg, #2563eb, #3b82f6);
+  --accent-glow: rgba(37, 99, 235, 0.25);
+  --accent-hover: #1d4ed8;
+  --accent-soft: #eff6ff;
+  --success: #16a34a;
+  --success-soft: #f0fdf4;
+  --danger: #dc2626;
+  --danger-soft: #fef2f2;
+  --shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.04), 0 2px 6px -1px rgba(15, 23, 42, 0.02);
+  --shadow-lg: 0 12px 20px -8px rgba(15, 23, 42, 0.12), 0 4px 10px -2px rgba(15, 23, 42, 0.08);
+  --radius: 12px;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #09090b;
+    --bg-gradient: radial-gradient(circle at 100% 0%, rgba(59, 130, 246, 0.14) 0%, transparent 55%),
+                   radial-gradient(circle at 0% 100%, rgba(99, 102, 241, 0.08) 0%, transparent 45%),
+                   #09090b;
+    --panel: #16161a;
+    --panel-soft: #202024;
+    --ink: #f4f4f5;
+    --muted: #8e939e;
+    --line: #242428;
+    --line-strong: #333338;
+    --accent: #3b82f6;
+    --accent-gradient: linear-gradient(135deg, #3b82f6, #60a5fa);
+    --accent-glow: rgba(59, 130, 246, 0.35);
+    --accent-hover: #2563eb;
+    --accent-soft: #1e293b;
+    --success: #22c55e;
+    --success-soft: #14532d;
+    --danger: #ef4444;
+    --danger-soft: #7f1d1d;
+    --shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.3), 0 2px 6px -1px rgba(0, 0, 0, 0.2);
+    --shadow-lg: 0 12px 20px -8px rgba(0, 0, 0, 0.5), 0 4px 10px -2px rgba(0, 0, 0, 0.3);
+  }
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  width: 350px;
+  background: var(--bg-gradient);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+}
+
+/* Header */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--accent-gradient);
+  color: #ffffff;
+  padding: 5px;
+  box-shadow: 0 3px 8px var(--accent-glow);
+}
+
+.brand h1 {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+/* Settings Button */
+button#options {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+button#options:hover {
+  background-color: var(--panel-soft);
+  color: var(--ink);
+  border-color: var(--line-strong);
+  transform: translateY(-1px);
+}
+
+button#options:active {
+  transform: translateY(0);
+}
+
+/* Context Badge */
+.context-source {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  background: var(--panel-soft);
+  padding: 4px 8px;
+  border-radius: 6px;
+  width: fit-content;
+  border: 1px solid var(--line);
+  display: none; /* Shown dynamically in JS */
+  align-items: center;
+  gap: 6px;
+}
+
+/* Form Styles */
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.input-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+input {
+  width: 100%;
+  padding: 10px 12px 10px 36px; /* indent for the left icon */
+  font-family: inherit;
+  font-size: 14px;
+  background-color: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink);
+  outline: none;
+  box-shadow: var(--shadow);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+  background-color: var(--panel);
+}
+
+/* Add Button */
+button[type="submit"] {
+  width: 100%;
+  padding: 11px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--accent-gradient);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 12px var(--accent-glow);
+}
+
+button[type="submit"]:hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 6px 16px var(--accent-glow);
+}
+
+button[type="submit"]:active {
+  transform: translateY(0.5px) scale(0.98);
+}
+
+button[type="submit"]:disabled {
+  background: var(--line-strong);
+  color: var(--muted);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-icon {
+  width: 15px;
+  height: 15px;
+}
+
+/* Spinner */
+.spinner {
+  display: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Status Messages */
+.status-container {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+}
+
+#status {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+#status.success {
+  color: var(--success);
+  background-color: var(--success-soft);
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(34, 197, 94, 0.15);
+}
+
+#status.error {
+  color: var(--danger);
+  background-color: var(--danger-soft);
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(239, 68, 68, 0.15);
+}
+
+

@@ -1,0 +1,10 @@
+{
+  "name": "voca-native",
+  "version": "1.0.0",
+  "description": "Local native module for Voca Dictionary App Group and Shared Storage",
+  "main": "index.ts",
+  "types": "index.ts",
+  "peerDependencies": {
+    "expo": "*"
+  }
+}

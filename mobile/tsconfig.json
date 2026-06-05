@@ -1,0 +1,11 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@voca/core/*": ["../packages/voca-core/src/*"]
+    }
+  },
+  "include": ["app", "src", "../packages/voca-core/src"]
+}

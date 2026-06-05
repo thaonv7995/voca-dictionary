@@ -1,0 +1,2 @@
+export const DEFAULT_VOCA_API_TOKEN = "voca_55c2ac41266be58e43d0ef2b5817b4c9053a2ed7410fcefd";
+

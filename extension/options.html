@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Voca Dictionary Extension Settings</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="options.css">
+  </head>
+  <body>
+    <main>
+      <header>
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 6 L12 18 L20 6" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <div class="header-text">
+          <h1>Voca Clipper Settings</h1>
+          <p>Configure Local API bridge, LLM AI connection, and extension interaction behaviors.</p>
+        </div>
+      </header>
+
+      <form id="settings-form">
+        <!-- Section 1: Local Bridge -->
+        <section class="settings-card">
+          <h2>Local Bridge & App</h2>
+          <div class="form-group row-group">
+            <div class="input-field">
+              <label for="apiPort">Local API Port</label>
+              <input id="apiPort" name="apiPort" type="text" inputmode="numeric" placeholder="22053">
+            </div>
+            <div class="action-field">
+              <button type="button" id="test-btn" class="secondary-btn">Test Connection</button>
+            </div>
+          </div>
+          <div class="test-result-container">
+            <span id="test-status" role="status"></span>
+          </div>
+
+        </section>
+
+        <!-- Section 2: AI Service Settings -->
+        <section class="settings-card">
+          <h2>AI Service Configuration</h2>
+          <div class="form-group">
+            <label for="baseURL">Base URL</label>
+            <input id="baseURL" name="baseURL" type="url" placeholder="https://api.openai.com/v1">
+            <p class="field-desc">The Base API endpoint of your LLM provider.</p>
+          </div>
+          
+          <div class="form-group">
+            <label for="apiKey">API Key</label>
+            <input id="apiKey" name="apiKey" type="password" autocomplete="off" placeholder="••••••••••••••••">
+            <p class="field-desc">Authorization key for the AI service provider.</p>
+          </div>
+
+          <div class="form-group">
+            <label for="model">Model</label>
+            <input id="model" name="model" type="text" placeholder="gpt-4.1-mini">
+            <p class="field-desc">The specific model name to generate vocabulary definitions.</p>
+          </div>
+        </section>
+
+        <!-- Section 3: Clipper Behavior Settings -->
+        <section class="settings-card">
+          <h2>Clipper Behavior</h2>
+          <div class="checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="showBubble" name="showBubble">
+              <span class="checkbox-text-container">
+                <span class="checkbox-title">Show Selection Tooltip</span>
+                <span class="checkbox-desc">Show inline "Add to Voca" bubble tooltip when selecting or double-clicking text.</span>
+              </span>
+            </label>
+
+            <label class="checkbox-label">
+              <input type="checkbox" id="showToasts" name="showToasts">
+              <span class="checkbox-text-container">
+                <span class="checkbox-title">Show Notification Toasts</span>
+                <span class="checkbox-desc">Show progress and result toasts in the bottom-right corner of web pages.</span>
+              </span>
+            </label>
+          </div>
+        </section>
+
+        <div class="form-actions">
+          <button type="submit" class="primary-btn">Save settings</button>
+          <span id="status" role="status"></span>
+        </div>
+      </form>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>

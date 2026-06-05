@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="Voca Clipper">
+  <defs>
+    <linearGradient id="bg" x1="20" y1="12" x2="110" y2="118" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2f80ff"/>
+      <stop offset=".58" stop-color="#1f6feb"/>
+      <stop offset="1" stop-color="#114aa8"/>
+    </linearGradient>
+    <linearGradient id="page" x1="41" y1="22" x2="90" y2="99" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dfeaff"/>
+    </linearGradient>
+    <filter id="shadow" x="16" y="14" width="96" height="104" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="7" flood-color="#08295f" flood-opacity=".24" stdDeviation="6"/>
+    </filter>
+  </defs>
+  <rect width="128" height="128" rx="26" fill="url(#bg)"/>
+  <path fill="#77aaff" opacity=".35" d="M18 92c19 15 45 20 74 13 12-3 21-8 28-14v37H18z"/>
+  <g filter="url(#shadow)">
+    <path fill="url(#page)" d="M35 22h45l20 20v60a8 8 0 0 1-8 8H35a8 8 0 0 1-8-8V30a8 8 0 0 1 8-8Z"/>
+    <path fill="#b9cdf6" d="M79 22v15a6 6 0 0 0 6 6h15z"/>
+    <path fill="#1f6feb" d="M42 42h16l8 35 8-35h16L77 92H55z"/>
+    <path fill="#8fb4f8" d="M44 91h44v7H44z"/>
+  </g>
+</svg>

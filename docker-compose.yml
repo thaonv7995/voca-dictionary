@@ -1,0 +1,37 @@
+services:
+  voca-dictionary:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: voca-dictionary-preview
+    ports:
+      - "127.0.0.1:22052:80"
+    environment:
+      VOCA_DATA: /voca-data
+    volumes:
+      - ./:/voca-data:ro
+    restart: unless-stopped
+
+  voca-bridge:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.bridge
+    container_name: voca-dictionary-bridge
+    ports:
+      - "0.0.0.0:22053:22053"
+    environment:
+      VOCA_API_TOKEN: ${VOCA_API_TOKEN:-}
+      VOCA_API_TOKENS: ${VOCA_API_TOKENS:-}
+      VOCA_LLM_API_KEY: ${VOCA_LLM_API_KEY:-}
+      VOCA_LLM_BASE_URL: ${VOCA_LLM_BASE_URL:-}
+      VOCA_LLM_MODEL: ${VOCA_LLM_MODEL:-}
+      VOCA_TTS_API_KEY: ${VOCA_TTS_API_KEY:-}
+      VOCA_TTS_BASE_URL: ${VOCA_TTS_BASE_URL:-}
+      VOCA_TTS_ENDPOINT: ${VOCA_TTS_ENDPOINT:-}
+      VOCA_TTS_MODEL: ${VOCA_TTS_MODEL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+    volumes:
+      - ./:/voca-data
+    restart: unless-stopped

@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "Voca Dictionary Clipper",
+  "description": "Add selected web vocabulary to the local Voca Dictionary.",
+  "version": "0.1.0",
+  "permissions": ["activeTab", "contextMenus", "storage"],
+  "host_permissions": ["http://127.0.0.1:22053/*", "http://localhost:22053/*", "https://voca-bridge.thaonv.online/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "Add to Voca Dictionary",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "options_page": "options.html",
+  "commands": {
+    "add-selection": {
+      "suggested_key": {
+        "default": "Alt+Shift+V",
+        "mac": "Alt+Shift+V"
+      },
+      "description": "Add selected or focused word to Voca Dictionary"
+    }
+  }
+}

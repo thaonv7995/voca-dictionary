@@ -1,0 +1,727 @@
+/*
+  20 palette trung tính (tông xám / giấy / slate).
+  Chọn: <html data-palette="..."> — khi không gán palette = dùng mặc định (inkwell trong script).
+  File được generate bởi scripts/generate-theme-colors.mjs — chạy lại sau khi sửa script.
+*/
+
+
+html[data-theme="light"]:where(:not([data-palette]), [data-palette="inkwell"]) {
+  --bg: #ebecef;
+  --panel: #ffffff;
+  --panel-soft: #f3f4f6;
+  --ink: #111113;
+  --muted: #5c5e66;
+  --line: #d8d9df;
+  --line-strong: #c2c4cd;
+  --accent: #32343b;
+  --accent-soft: #e4e6ec;
+  --success-soft: #ecf4f0;
+  --success-ink: #3f5c4f;
+  --danger-soft: #f8ecee;
+  --danger-ink: #9f2d3d;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.07);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%235C5E66' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="dark"]:where(:not([data-palette]), [data-palette="inkwell"]) {
+  --bg: #080809;
+  --panel: #16171a;
+  --panel-soft: #0d0d0f;
+  --ink: #f0f0f2;
+  --muted: #888b94;
+  --line: #222226;
+  --line-strong: #383a42;
+  --accent: #9b9ea8;
+  --accent-soft: #1a1b1f;
+  --success-soft: #1a2420;
+  --success-ink: #8aa899;
+  --danger-soft: #2a181c;
+  --danger-ink: #d4a3ad;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%23888B94' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="light"][data-palette="classic"] {
+  --bg: #f3f4f6;
+  --panel: #ffffff;
+  --panel-soft: #f8f9fa;
+  --ink: #18181b;
+  --muted: #71717a;
+  --line: #e4e4e7;
+  --line-strong: #d4d4d8;
+  --accent: #4b5563;
+  --accent-soft: #eceef2;
+  --success-soft: #ecf4f0;
+  --success-ink: #3f5c4f;
+  --danger-soft: #f8ecee;
+  --danger-ink: #9f2d3d;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.06);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%2371717A' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="dark"][data-palette="classic"] {
+  --bg: #0c0d0f;
+  --panel: #16171a;
+  --panel-soft: #111113;
+  --ink: #f4f4f5;
+  --muted: #a1a1aa;
+  --line: #27272a;
+  --line-strong: #3f3f46;
+  --accent: #a1a1aa;
+  --accent-soft: #232429;
+  --success-soft: #1a2420;
+  --success-ink: #8aa899;
+  --danger-soft: #2a181c;
+  --danger-ink: #d4a3ad;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%23A1A1AA' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="light"][data-palette="ocean"] {
+  --bg: #f3f6f6;
+  --panel: #ffffff;
+  --panel-soft: #f7faf9;
+  --ink: #18181b;
+  --muted: #6b7372;
+  --line: #e2e9e8;
+  --line-strong: #d0dcdc;
+  --accent: #4a5b59;
+  --accent-soft: #eaf0ef;
+  --success-soft: #ecf4f0;
+  --success-ink: #3f5c4f;
+  --danger-soft: #f8ecee;
+  --danger-ink: #9f2d3d;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.055);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%236B7372' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="dark"][data-palette="ocean"] {
+  --bg: #0c0f0e;
+  --panel: #16171a;
+  --panel-soft: #101413;
+  --ink: #f4f7f7;
+  --muted: #9da8a7;
+  --line: #262f2e;
+  --line-strong: #3a4847;
+  --accent: #9eada9;
+  --accent-soft: #212a29;
+  --success-soft: #1a2420;
+  --success-ink: #8aa899;
+  --danger-soft: #2a181c;
+  --danger-ink: #d4a3ad;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%239DA8A7' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="light"][data-palette="sunset"] {
+  --bg: #f7f6f4;
+  --panel: #ffffff;
+  --panel-soft: #fafaf8;
+  --ink: #1c1917;
+  --muted: #78716c;
+  --line: #e9e7e5;
+  --line-strong: #d9d6d3;
+  --accent: #57534e;
+  --accent-soft: #f0eee9;
+  --success-soft: #ecf4f0;
+  --success-ink: #3f5c4f;
+  --danger-soft: #f8ecee;
+  --danger-ink: #9f2d3d;
+  --shadow: 0 12px 32px rgba(28, 25, 23, 0.05);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%2378716C' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="dark"][data-palette="sunset"] {
+  --bg: #0f0e0d;
+  --panel: #16171a;
+  --panel-soft: #131211;
+  --ink: #f7f5f3;
+  --muted: #b4aba4;
+  --line: #332f2d;
+  --line-strong: #4e4845;
+  --accent: #b8ada5;
+  --accent-soft: #292522;
+  --success-soft: #1a2420;
+  --success-ink: #8aa899;
+  --danger-soft: #2a181c;
+  --danger-ink: #d4a3ad;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%23B4ABA4' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="light"][data-palette="violet"] {
+  --bg: #f4f3f6;
+  --panel: #ffffff;
+  --panel-soft: #faf9fb;
+  --ink: #18181b;
+  --muted: #716e78;
+  --line: #e9e8ec;
+  --line-strong: #dad9e0;
+  --accent: #5c5966;
+  --accent-soft: #eef0f4;
+  --success-soft: #ecf4f0;
+  --success-ink: #3f5c4f;
+  --danger-soft: #f8ecee;
+  --danger-ink: #9f2d3d;
+  --shadow: 0 12px 32px rgba(24, 20, 40, 0.05);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%23716E78' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="dark"][data-palette="violet"] {
+  --bg: #0d0c10;
+  --panel: #16171a;
+  --panel-soft: #111015;
+  --ink: #f2f2f6;
+  --muted: #a8a5b5;
+  --line: #2c2a34;
+  --line-strong: #43404e;
+  --accent: #aea9bc;
+  --accent-soft: #28262f;
+  --success-soft: #1a2420;
+  --success-ink: #8aa899;
+  --danger-soft: #2a181c;
+  --danger-ink: #d4a3ad;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%23A8A5B5' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="light"][data-palette="graphite"] {
+  --bg: #f0f1f3;
+  --panel: #ffffff;
+  --panel-soft: #f6f7f8;
+  --ink: #18181b;
+  --muted: #6b6e75;
+  --line: #dfe1e5;
+  --line-strong: #cbced4;
+  --accent: #3d4249;
+  --accent-soft: #e8eaee;
+  --success-soft: #ecf4f0;
+  --success-ink: #3f5c4f;
+  --danger-soft: #f8ecee;
+  --danger-ink: #9f2d3d;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.06);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%236B6E75' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="dark"][data-palette="graphite"] {
+  --bg: #0a0b0c;
+  --panel: #16171a;
+  --panel-soft: #0e0f11;
+  --ink: #f3f4f6;
+  --muted: #9ca0a8;
+  --line: #25282e;
+  --line-strong: #3a3f47;
+  --accent: #9ca0a8;
+  --accent-soft: #1e2228;
+  --success-soft: #1a2420;
+  --success-ink: #8aa899;
+  --danger-soft: #2a181c;
+  --danger-ink: #d4a3ad;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%239CA0A8' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="light"][data-palette="parchment"] {
+  --bg: #faf6ed;
+  --panel: #ffffff;
+  --panel-soft: #fdfaf3;
+  --ink: #1c1917;
+  --muted: #756f66;
+  --line: #ebe4d8;
+  --line-strong: #dad2c4;
+  --accent: #565049;
+  --accent-soft: #f2ebe0;
+  --success-soft: #ecf4f0;
+  --success-ink: #3f5c4f;
+  --danger-soft: #f8ecee;
+  --danger-ink: #9f2d3d;
+  --shadow: 0 12px 32px rgba(40, 35, 25, 0.05);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%23756F66' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="dark"][data-palette="parchment"] {
+  --bg: #12100d;
+  --panel: #16171a;
+  --panel-soft: #1a1814;
+  --ink: #f7f3ea;
+  --muted: #a89b8c;
+  --line: #3a352e;
+  --line-strong: #534c42;
+  --accent: #b5a99a;
+  --accent-soft: #2a2620;
+  --success-soft: #1a2420;
+  --success-ink: #8aa899;
+  --danger-soft: #2a181c;
+  --danger-ink: #d4a3ad;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%23A89B8C' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="light"][data-palette="mist"] {
+  --bg: #eef2f7;
+  --panel: #ffffff;
+  --panel-soft: #f5f7fb;
+  --ink: #18181b;
+  --muted: #647081;
+  --line: #dde3ec;
+  --line-strong: #c8d0dc;
+  --accent: #475468;
+  --accent-soft: #e6ecf4;
+  --success-soft: #ecf4f0;
+  --success-ink: #3f5c4f;
+  --danger-soft: #f8ecee;
+  --danger-ink: #9f2d3d;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.06);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%23647081' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="dark"][data-palette="mist"] {
+  --bg: #0c0e12;
+  --panel: #16171a;
+  --panel-soft: #10141a;
+  --ink: #eef2f8;
+  --muted: #8e9aaf;
+  --line: #262d3a;
+  --line-strong: #3a4556;
+  --accent: #96a4ba;
+  --accent-soft: #1c2430;
+  --success-soft: #1a2420;
+  --success-ink: #8aa899;
+  --danger-soft: #2a181c;
+  --danger-ink: #d4a3ad;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%238E9AAF' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="light"][data-palette="sandstone"] {
+  --bg: #f5f3ef;
+  --panel: #ffffff;
+  --panel-soft: #faf8f4;
+  --ink: #1c1917;
+  --muted: #736a62;
+  --line: #e6e2dc;
+  --line-strong: #d4cfc6;
+  --accent: #524c46;
+  --accent-soft: #edeae3;
+  --success-soft: #ecf4f0;
+  --success-ink: #3f5c4f;
+  --danger-soft: #f8ecee;
+  --danger-ink: #9f2d3d;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.06);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%23736A62' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="dark"][data-palette="sandstone"] {
+  --bg: #100e0b;
+  --panel: #16171a;
+  --panel-soft: #181613;
+  --ink: #f5f3ef;
+  --muted: #a89f96;
+  --line: #34302b;
+  --line-strong: #4f4942;
+  --accent: #ae9f94;
+  --accent-soft: #292521;
+  --success-soft: #1a2420;
+  --success-ink: #8aa899;
+  --danger-soft: #2a181c;
+  --danger-ink: #d4a3ad;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%23A89F96' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="light"][data-palette="fog"] {
+  --bg: #fafafa;
+  --panel: #ffffff;
+  --panel-soft: #fdfdfd;
+  --ink: #18181b;
+  --muted: #737373;
+  --line: #e5e5e5;
+  --line-strong: #d4d4d4;
+  --accent: #525252;
+  --accent-soft: #f0f0f0;
+  --success-soft: #ecf4f0;
+  --success-ink: #3f5c4f;
+  --danger-soft: #f8ecee;
+  --danger-ink: #9f2d3d;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.04);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%23737373' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="dark"][data-palette="fog"] {
+  --bg: #0a0a0a;
+  --panel: #16171a;
+  --panel-soft: #141414;
+  --ink: #fafafa;
+  --muted: #a3a3a3;
+  --line: #262626;
+  --line-strong: #404040;
+  --accent: #a3a3a3;
+  --accent-soft: #1f1f1f;
+  --success-soft: #1a2420;
+  --success-ink: #8aa899;
+  --danger-soft: #2a181c;
+  --danger-ink: #d4a3ad;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%23A3A3A3' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="light"][data-palette="birch"] {
+  --bg: #fafaf9;
+  --panel: #ffffff;
+  --panel-soft: #fcfcfc;
+  --ink: #171717;
+  --muted: #6f6f6f;
+  --line: #e7e5e4;
+  --line-strong: #d6d3d1;
+  --accent: #44403c;
+  --accent-soft: #f0eeec;
+  --success-soft: #ecf4f0;
+  --success-ink: #3f5c4f;
+  --danger-soft: #f8ecee;
+  --danger-ink: #9f2d3d;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.06);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%236F6F6F' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="dark"][data-palette="birch"] {
+  --bg: #0c0b0a;
+  --panel: #16171a;
+  --panel-soft: #131110;
+  --ink: #fafaf9;
+  --muted: #a8a29e;
+  --line: #2e2a28;
+  --line-strong: #48423e;
+  --accent: #a8a29e;
+  --accent-soft: #24201e;
+  --success-soft: #1a2420;
+  --success-ink: #8aa899;
+  --danger-soft: #2a181c;
+  --danger-ink: #d4a3ad;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%23A8A29E' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="light"][data-palette="pewter"] {
+  --bg: #f0f2f6;
+  --panel: #ffffff;
+  --panel-soft: #f6f7fa;
+  --ink: #18181b;
+  --muted: #656b78;
+  --line: #dde0e8;
+  --line-strong: #c8ccd6;
+  --accent: #505866;
+  --accent-soft: #e8ebf2;
+  --success-soft: #ecf4f0;
+  --success-ink: #3f5c4f;
+  --danger-soft: #f8ecee;
+  --danger-ink: #9f2d3d;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.06);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%23656B78' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="dark"][data-palette="pewter"] {
+  --bg: #0b0d11;
+  --panel: #16171a;
+  --panel-soft: #101218;
+  --ink: #eef1f7;
+  --muted: #949bab;
+  --line: #262a35;
+  --line-strong: #3c424f;
+  --accent: #9aa3b4;
+  --accent-soft: #1e232d;
+  --success-soft: #1a2420;
+  --success-ink: #8aa899;
+  --danger-soft: #2a181c;
+  --danger-ink: #d4a3ad;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%23949BAB' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="light"][data-palette="oyster"] {
+  --bg: #f8f7f9;
+  --panel: #ffffff;
+  --panel-soft: #fcfbfd;
+  --ink: #18181b;
+  --muted: #6f6d75;
+  --line: #e8e7ec;
+  --line-strong: #d8d6de;
+  --accent: #57545e;
+  --accent-soft: #f0eff4;
+  --success-soft: #ecf4f0;
+  --success-ink: #3f5c4f;
+  --danger-soft: #f8ecee;
+  --danger-ink: #9f2d3d;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.06);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%236F6D75' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="dark"][data-palette="oyster"] {
+  --bg: #0d0c0f;
+  --panel: #16171a;
+  --panel-soft: #121116;
+  --ink: #f4f3f8;
+  --muted: #a29eac;
+  --line: #2c2a32;
+  --line-strong: #45424e;
+  --accent: #b4afc0;
+  --accent-soft: #24222a;
+  --success-soft: #1a2420;
+  --success-ink: #8aa899;
+  --danger-soft: #2a181c;
+  --danger-ink: #d4a3ad;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%23A29EAC' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="light"][data-palette="shale"] {
+  --bg: #eff2f0;
+  --panel: #ffffff;
+  --panel-soft: #f6f8f7;
+  --ink: #18181b;
+  --muted: #5f6864;
+  --line: #dbe0dd;
+  --line-strong: #c5ccc8;
+  --accent: #464f4b;
+  --accent-soft: #e5ebe8;
+  --success-soft: #ecf4f0;
+  --success-ink: #3f5c4f;
+  --danger-soft: #f8ecee;
+  --danger-ink: #9f2d3d;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.06);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%235F6864' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="dark"][data-palette="shale"] {
+  --bg: #0b0e0c;
+  --panel: #16171a;
+  --panel-soft: #0f1311;
+  --ink: #f0f4f2;
+  --muted: #96a39e;
+  --line: #252f2b;
+  --line-strong: #3a4742;
+  --accent: #9eada7;
+  --accent-soft: #1c2421;
+  --success-soft: #1a2420;
+  --success-ink: #8aa899;
+  --danger-soft: #2a181c;
+  --danger-ink: #d4a3ad;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%2396A39E' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="light"][data-palette="sage"] {
+  --bg: #f1f3ef;
+  --panel: #ffffff;
+  --panel-soft: #f7f9f5;
+  --ink: #18181b;
+  --muted: #656e64;
+  --line: #dde2db;
+  --line-strong: #c8d0c7;
+  --accent: #4a5349;
+  --accent-soft: #e6ece4;
+  --success-soft: #ecf4f0;
+  --success-ink: #3f5c4f;
+  --danger-soft: #f8ecee;
+  --danger-ink: #9f2d3d;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.06);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%23656E64' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="dark"][data-palette="sage"] {
+  --bg: #0b0d0b;
+  --panel: #16171a;
+  --panel-soft: #101210;
+  --ink: #f1f4f0;
+  --muted: #9aa396;
+  --line: #262b26;
+  --line-strong: #3b443b;
+  --accent: #a3ada1;
+  --accent-soft: #1d221d;
+  --success-soft: #1a2420;
+  --success-ink: #8aa899;
+  --danger-soft: #2a181c;
+  --danger-ink: #d4a3ad;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%239AA396' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="light"][data-palette="latte"] {
+  --bg: #f9f6f1;
+  --panel: #ffffff;
+  --panel-soft: #fcfaf6;
+  --ink: #1c1917;
+  --muted: #736d64;
+  --line: #ebe6de;
+  --line-strong: #dad3c8;
+  --accent: #585248;
+  --accent-soft: #f1ece3;
+  --success-soft: #ecf4f0;
+  --success-ink: #3f5c4f;
+  --danger-soft: #f8ecee;
+  --danger-ink: #9f2d3d;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.06);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%23736D64' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="dark"][data-palette="latte"] {
+  --bg: #100f0c;
+  --panel: #16171a;
+  --panel-soft: #181612;
+  --ink: #f8f5ef;
+  --muted: #ada294;
+  --line: #34302a;
+  --line-strong: #4d4740;
+  --accent: #b8ab9c;
+  --accent-soft: #28241e;
+  --success-soft: #1a2420;
+  --success-ink: #8aa899;
+  --danger-soft: #2a181c;
+  --danger-ink: #d4a3ad;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%23ADA294' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="light"][data-palette="cedar"] {
+  --bg: #f4f1ec;
+  --panel: #ffffff;
+  --panel-soft: #faf7f1;
+  --ink: #1c1917;
+  --muted: #6e6860;
+  --line: #e6e0d8;
+  --line-strong: #d3ccc2;
+  --accent: #524a42;
+  --accent-soft: #ede8e0;
+  --success-soft: #ecf4f0;
+  --success-ink: #3f5c4f;
+  --danger-soft: #f8ecee;
+  --danger-ink: #9f2d3d;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.06);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%236E6860' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="dark"][data-palette="cedar"] {
+  --bg: #0f0d0a;
+  --panel: #16171a;
+  --panel-soft: #16140f;
+  --ink: #f5f1ea;
+  --muted: #a3988c;
+  --line: #332f29;
+  --line-strong: #4c4640;
+  --accent: #b0a090;
+  --accent-soft: #26221c;
+  --success-soft: #1a2420;
+  --success-ink: #8aa899;
+  --danger-soft: #2a181c;
+  --danger-ink: #d4a3ad;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%23A3988C' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="light"][data-palette="cobalt"] {
+  --bg: #eef1f8;
+  --panel: #ffffff;
+  --panel-soft: #f5f7fd;
+  --ink: #18181b;
+  --muted: #636b7c;
+  --line: #dde2ef;
+  --line-strong: #c8d0e3;
+  --accent: #4a5a72;
+  --accent-soft: #e6eaf5;
+  --success-soft: #ecf4f0;
+  --success-ink: #3f5c4f;
+  --danger-soft: #f8ecee;
+  --danger-ink: #9f2d3d;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.06);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%23636B7C' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="dark"][data-palette="cobalt"] {
+  --bg: #0b0d12;
+  --panel: #16171a;
+  --panel-soft: #10131a;
+  --ink: #eef2fb;
+  --muted: #949db2;
+  --line: #262c3b;
+  --line-strong: #3a4358;
+  --accent: #9eadc8;
+  --accent-soft: #1c2330;
+  --success-soft: #1a2420;
+  --success-ink: #8aa899;
+  --danger-soft: #2a181c;
+  --danger-ink: #d4a3ad;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%23949DB2' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="light"][data-palette="storm"] {
+  --bg: #e8ecf2;
+  --panel: #ffffff;
+  --panel-soft: #f0f3f8;
+  --ink: #18181b;
+  --muted: #5f6672;
+  --line: #d5dbe5;
+  --line-strong: #bfc7d4;
+  --accent: #434a56;
+  --accent-soft: #e2e7ef;
+  --success-soft: #ecf4f0;
+  --success-ink: #3f5c4f;
+  --danger-soft: #f8ecee;
+  --danger-ink: #9f2d3d;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.06);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%235F6672' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="dark"][data-palette="storm"] {
+  --bg: #0b0d10;
+  --panel: #16171a;
+  --panel-soft: #101318;
+  --ink: #eceff4;
+  --muted: #949ca8;
+  --line: #262b34;
+  --line-strong: #3c434e;
+  --accent: #a0a9b6;
+  --accent-soft: #1c2128;
+  --success-soft: #1a2420;
+  --success-ink: #8aa899;
+  --danger-soft: #2a181c;
+  --danger-ink: #d4a3ad;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%23949CA8' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="light"][data-palette="noir"] {
+  --bg: #e6e7e9;
+  --panel: #ffffff;
+  --panel-soft: #efeff2;
+  --ink: #0a0a0b;
+  --muted: #52545c;
+  --line: #d0d2d6;
+  --line-strong: #b8bbc2;
+  --accent: #2d2f35;
+  --accent-soft: #dcdee3;
+  --success-soft: #ecf4f0;
+  --success-ink: #3f5c4f;
+  --danger-soft: #f8ecee;
+  --danger-ink: #9f2d3d;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%2352545C' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html[data-theme="dark"][data-palette="noir"] {
+  --bg: #050506;
+  --panel: #16171a;
+  --panel-soft: #0a0a0c;
+  --ink: #ececed;
+  --muted: #8b8d96;
+  --line: #1e1f24;
+  --line-strong: #32343c;
+  --accent: #9ea1ab;
+  --accent-soft: #15161a;
+  --success-soft: #1a2420;
+  --success-ink: #8aa899;
+  --danger-soft: #2a181c;
+  --danger-ink: #d4a3ad;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --select-arrow: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%238B8D96' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+

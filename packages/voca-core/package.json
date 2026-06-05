@@ -1,0 +1,18 @@
+{
+  "name": "@voca/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./data/schema": "./src/data/schema.ts",
+    "./data/search": "./src/data/search.ts",
+    "./data/tags": "./src/data/tags.ts",
+    "./auth/token": "./src/auth/token.ts",
+    "./practice/judge": "./src/practice/judge.ts",
+    "./practice/parsers": "./src/practice/parsers.ts",
+    "./practice/prompts": "./src/practice/prompts.ts",
+    "./practice/quality": "./src/practice/quality.ts",
+    "./practice/types": "./src/practice/types.ts",
+    "./practice/utils": "./src/practice/utils.ts"
+  }
+}
