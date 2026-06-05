@@ -80,7 +80,7 @@ function sendJson(request, response, status, payload) {
   const origin = ALLOWED_ORIGINS.has(requestOrigin) ? requestOrigin : "http://localhost:22052";
   response.writeHead(status, {
     "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Methods": "GET, HEAD, PATCH, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, HEAD, PATCH, POST, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Authorization, Content-Type",
     "Content-Type": "application/json; charset=utf-8",
   });
