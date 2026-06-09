@@ -1342,8 +1342,20 @@ Return ONLY a JSON object in this exact schema:
         : [];
 
       if (phrases.length === 0) {
-        writeEvent(response, { type: "error", message: `No common idioms found for "${word}".` });
-        response.end();
+        writeEvent(response, { type: "progress", message: `No common idioms found for "${word}". Falling back to creating card for "${word}" itself...` });
+        try {
+          const result = await createCardLimiter.run(() =>
+            runCreateCard({ word, settings: resolvedSettings, response })
+          );
+          const done = [...result.events].reverse().find((event) => event.type === "done");
+          if (!done) {
+            writeEvent(response, { type: "done", message: "Completed", copied: [], skipped: [], outputDir: undefined });
+          }
+          response.end();
+        } catch (err) {
+          writeEvent(response, { type: "error", message: err.message });
+          response.end();
+        }
         return;
       }
 
