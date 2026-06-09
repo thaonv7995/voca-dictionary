@@ -204,6 +204,71 @@ function rewriteLoopbackUrlForDocker(value) {
   return value;
 }
 
+function escapeRawControlCharsInStrings(jsonStr) {
+  let result = "";
+  let inString = false;
+  let isEscaped = false;
+  for (let i = 0; i < jsonStr.length; i++) {
+    const char = jsonStr[i];
+    if (char === '"' && !isEscaped) {
+      inString = !inString;
+      result += char;
+    } else if (inString && (char === '\n' || char === '\r' || char === '\t')) {
+      if (char === '\n') {
+        result += '\\n';
+      } else if (char === '\r') {
+        if (jsonStr[i + 1] === '\n') {
+          result += '\\n';
+          i++;
+        } else {
+          result += '\\n';
+        }
+      } else if (char === '\t') {
+        result += '\\t';
+      }
+    } else {
+      result += char;
+    }
+
+    if (char === '\\' && inString) {
+      isEscaped = !isEscaped;
+    } else {
+      isEscaped = false;
+    }
+  }
+  return result;
+}
+
+function extractJson(text) {
+  const sanitized = escapeRawControlCharsInStrings(text);
+  let cleaned = sanitized.trim();
+  cleaned = cleaned.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  cleaned = cleaned.trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch (err) {
+    const firstBrace = cleaned.indexOf("{");
+    const firstBracket = cleaned.indexOf("[");
+    let start = -1;
+    let end = -1;
+    if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
+      start = firstBrace;
+      end = cleaned.lastIndexOf("}");
+    } else if (firstBracket !== -1) {
+      start = firstBracket;
+      end = cleaned.lastIndexOf("]");
+    }
+    if (start !== -1 && end > start) {
+      try {
+        return JSON.parse(cleaned.slice(start, end + 1));
+      } catch (innerErr) {
+        // Fall through
+      }
+    }
+    throw err;
+  }
+}
+
 function normalizeOutboundSettings(settings) {
   return {
     ...settings,
@@ -1336,7 +1401,7 @@ Return ONLY a JSON object in this exact schema:
       const data = await upstream.json();
       const choice = data.choices?.[0];
       const aiContent = choice?.message?.content || "";
-      const parsed = JSON.parse(aiContent.trim());
+      const parsed = extractJson(aiContent);
       const phrases = Array.isArray(parsed.phrases)
         ? parsed.phrases.map((p) => String(p).trim()).filter(Boolean)
         : [];

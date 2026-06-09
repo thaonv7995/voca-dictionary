@@ -168,16 +168,31 @@ function escapeRawControlCharsInStrings(jsonStr) {
 
 function extractJson(text) {
   const sanitized = escapeRawControlCharsInStrings(text);
-  const trimmed = sanitized.trim();
+  let cleaned = sanitized.trim();
+  cleaned = cleaned.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  cleaned = cleaned.trim();
   try {
-    return JSON.parse(trimmed);
-  } catch {
-    const start = trimmed.indexOf("[");
-    const end = trimmed.lastIndexOf("]");
-    if (start >= 0 && end > start) {
-      return JSON.parse(trimmed.slice(start, end + 1));
+    return JSON.parse(cleaned);
+  } catch (err) {
+    const firstBrace = cleaned.indexOf("{");
+    const firstBracket = cleaned.indexOf("[");
+    let start = -1;
+    let end = -1;
+    if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
+      start = firstBrace;
+      end = cleaned.lastIndexOf("}");
+    } else if (firstBracket !== -1) {
+      start = firstBracket;
+      end = cleaned.lastIndexOf("]");
     }
-    throw new Error("OpenAI response did not contain a JSON array.");
+    if (start !== -1 && end > start) {
+      try {
+        return JSON.parse(cleaned.slice(start, end + 1));
+      } catch (innerErr) {
+        // Fall through
+      }
+    }
+    throw err;
   }
 }
 
