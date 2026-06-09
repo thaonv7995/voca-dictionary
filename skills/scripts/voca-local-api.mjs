@@ -223,6 +223,33 @@ function audioCachePath({ text, voiceModel }) {
   };
 }
 
+class ConcurrencyLimiter {
+  constructor(maxConcurrency) {
+    this.maxConcurrency = maxConcurrency;
+    this.activeCount = 0;
+    this.queue = [];
+  }
+
+  async run(fn) {
+    if (this.activeCount >= this.maxConcurrency) {
+      await new Promise((resolve) => this.queue.push(resolve));
+    }
+    this.activeCount++;
+    try {
+      return await fn();
+    } finally {
+      this.activeCount--;
+      if (this.queue.length > 0) {
+        const next = this.queue.shift();
+        next();
+      }
+    }
+  }
+}
+
+const maxConcurrency = Number(process.env.VOCA_MAX_CONCURRENCY || 2);
+const createCardLimiter = new ConcurrencyLimiter(maxConcurrency);
+
 async function fileExists(filePath) {
   try {
     await fs.access(filePath);
@@ -1169,7 +1196,7 @@ async function handleV1Request(request, response, url) {
   sendApiError(request, response, 404, "NOT_FOUND", "Not found.");
 }
 
-function runCreateCard({ word, settings, response }) {
+function runCreateCard({ word, settings, response, silentDone = false }) {
   return new Promise((resolve, reject) => {
     const outboundSettings = normalizeOutboundSettings(settings);
     const child = spawn(process.execPath, [CREATE_CARD_SCRIPT, word], {
@@ -1194,7 +1221,19 @@ function runCreateCard({ word, settings, response }) {
       } catch {
         event = { type: "log", message: trimmed };
       }
+
+      if (event.type === "progress" && event.message && !event.message.startsWith(`[${word}]`)) {
+        event.message = `[${word}] ${event.message}`;
+      }
+      if (event.type === "log" && event.message && !event.message.startsWith(`[${word}]`)) {
+        event.message = `[${word}] ${event.message}`;
+      }
+
       events.push(event);
+
+      if (event.type === "done" && silentDone) {
+        return;
+      }
       writeEvent(response, event);
     };
     child.stdout.on("data", (data) => {
@@ -1311,27 +1350,31 @@ Return ONLY a JSON object in this exact schema:
       const skipped = [];
       const copied = [];
 
-      for (let i = 0; i < phrases.length; i++) {
-        const phrase = phrases[i];
-        writeEvent(response, {
-          type: "progress",
-          message: `Creating card for "${phrase}" (${i + 1}/${phrases.length})...`
-        });
-        try {
-          const result = await runCreateCard({ word: phrase, settings: resolvedSettings, response });
-          const doneEvent = [...result.events].reverse().find((event) => event.type === "done");
-          if (doneEvent) {
-            if (doneEvent.copied) copied.push(...doneEvent.copied);
-            if (doneEvent.skipped) skipped.push(...doneEvent.skipped);
+      const tasks = phrases.map((phrase) => {
+        return createCardLimiter.run(async () => {
+          try {
+            const result = await runCreateCard({
+              word: phrase,
+              settings: resolvedSettings,
+              response,
+              silentDone: true,
+            });
+            const doneEvent = [...result.events].reverse().find((event) => event.type === "done");
+            if (doneEvent) {
+              if (doneEvent.copied) copied.push(...doneEvent.copied);
+              if (doneEvent.skipped) skipped.push(...doneEvent.skipped);
+            }
+            createdCount++;
+          } catch (err) {
+            writeEvent(response, {
+              type: "log",
+              message: `Error creating card for "${phrase}": ${err.message}`
+            });
           }
-          createdCount++;
-        } catch (err) {
-          writeEvent(response, {
-            type: "log",
-            message: `Error creating card for "${phrase}": ${err.message}`
-          });
-        }
-      }
+        });
+      });
+
+      await Promise.all(tasks);
 
       writeEvent(response, {
         type: "done",
@@ -1347,7 +1390,9 @@ Return ONLY a JSON object in this exact schema:
   } else {
     streamHeaders(request, response);
     try {
-      const result = await runCreateCard({ word, settings: resolvedSettings, response });
+      const result = await createCardLimiter.run(() =>
+        runCreateCard({ word, settings: resolvedSettings, response })
+      );
       const done = [...result.events].reverse().find((event) => event.type === "done");
       if (!done) {
         writeEvent(response, { type: "done", message: "Completed", copied: [], skipped: [], outputDir: undefined });
