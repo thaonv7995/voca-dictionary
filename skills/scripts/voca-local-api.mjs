@@ -525,7 +525,7 @@ async function deleteCachedAudioForCard(card) {
       const filePath = path.join(directory, entry.name);
       if (entry.isDirectory()) {
         await walk(filePath);
-      } else if (entry.isFile() && entry.name.endsWith(".mp3") && entry.name.startsWith(readable)) {
+      } else if (entry.isFile() && entry.name.endsWith(".mp3") && (entry.name.startsWith(`${readable}-`) || entry.name === `${readable}.mp3`)) {
         try {
           await fs.unlink(filePath);
         } catch (err) {

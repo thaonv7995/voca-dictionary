@@ -1292,6 +1292,13 @@ function MarkdownText({ value }: { value: string }) {
   );
 }
 
+interface IdiomSuggestion {
+  phrase: string;
+  meaningEn: string;
+  meaningVi: string;
+  exists?: boolean;
+}
+
 export function App() {
   const { cards: manifestCards, manifest, loading, refreshing, error, lastLoadedAt, refresh } = useManifest();
   const [theme, setTheme] = useStoredState<Theme>("voca.theme", "light");
@@ -1305,6 +1312,14 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [contextScope, setContextScope] = useStoredState<GlobalContextScope>("voca.globalAgent.contextScope", defaultGlobalContextScope);
+  const [searchMode, setSearchMode] = useStoredState<"default" | "idioms">("voca.searchMode", "default");
+  
+  const [idioms, setIdioms] = useState<IdiomSuggestion[]>([]);
+  const [loadingIdioms, setLoadingIdioms] = useState(false);
+  const [idiomError, setIdiomError] = useState<string | null>(null);
+  const [selectedIdioms, setSelectedIdioms] = useState<Record<string, boolean>>({});
+  const [creatingIdiomsStatus, setCreatingIdiomsStatus] = useState<string | null>(null);
+  const [hasSearchedIdioms, setHasSearchedIdioms] = useState(false);
   const settings = useMemo(
     () => ({
       ...defaultSettings,
@@ -1560,9 +1575,171 @@ export function App() {
       });
     }
   };
+
+  const idiomsWithExistsStatus = useMemo(() => {
+    return idioms.map(item => ({
+      ...item,
+      exists: cards.some(c => c.word.toLowerCase() === item.phrase.toLowerCase())
+    }));
+  }, [idioms, cards]);
+
+  const handleFindIdioms = async (word: string) => {
+    const queryWord = word.trim();
+    if (!queryWord) return;
+
+    if (!settings.baseURL || !settings.apiKey || !settings.model) {
+      setIdiomError("Please configure LLM settings first in App Settings.");
+      return;
+    }
+
+    setLoadingIdioms(true);
+    setIdiomError(null);
+    setIdioms([]);
+    setSelectedIdioms({});
+    setHasSearchedIdioms(true);
+
+    try {
+      const prompt = `Give me the most common idioms, phrasal verbs, or collocations that contain the word "${queryWord}".
+Rules:
+- Only return high-frequency, highly practical phrases that are actually useful for TOEIC and daily English. Do NOT generate rare or unnatural phrases just to fill the list.
+- If there are no common, useful, or natural idioms/phrasal verbs/collocations containing the word "${queryWord}", return an empty array [] in the "idioms" field (i.e., {"idioms": []}).
+- phrase: The English phrase/idiom/collocation (must contain "${queryWord}").
+- meaningEn: A short, simple English definition suitable for TOEIC learners.
+- meaningVi: A concise, natural Vietnamese translation.
+
+Return ONLY a JSON object in this exact schema (no markdown, no other text):
+{
+  "idioms": [
+    {
+      "phrase": "phrase here",
+      "meaningEn": "meaning here",
+      "meaningVi": "meaning here"
+    }
+  ]
+}`;
+
+      const response = await fetchLlm(settings, {
+        model: settings.model,
+        stream: false,
+        messages: [
+          {
+            role: "system",
+            content: "You are a helpful TOEIC English dictionary assistant. You must return only a valid JSON object matching the requested schema.",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.3,
+      });
+
+      if (!response.ok) {
+        throw new Error(`AI API returned error (${response.status})`);
+      }
+
+      const data = await response.json();
+      const content = extractLlmResponseText(data);
+      const parsed = JSON.parse(content);
+
+      if (!parsed || !Array.isArray(parsed.idioms)) {
+        throw new Error("Invalid response format from AI.");
+      }
+
+      const suggested: IdiomSuggestion[] = parsed.idioms.map((item: any) => {
+        const phrase = String(item.phrase || "").trim();
+        return {
+          phrase,
+          meaningEn: String(item.meaningEn || "").trim(),
+          meaningVi: String(item.meaningVi || "").trim()
+        };
+      }).filter((item: IdiomSuggestion) => item.phrase);
+
+      setIdioms(suggested);
+
+      // Auto-select ones that don't exist yet
+      const initialSelected: Record<string, boolean> = {};
+      suggested.forEach(item => {
+        const cardExists = cards.some(c => c.word.toLowerCase() === item.phrase.toLowerCase());
+        if (!cardExists) {
+          initialSelected[item.phrase] = true;
+        }
+      });
+      setSelectedIdioms(initialSelected);
+    } catch (error) {
+      console.error(error);
+      setIdiomError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setLoadingIdioms(false);
+    }
+  };
+
+  const handleCreateSelectedIdioms = async () => {
+    const phrasesToCreate = Object.keys(selectedIdioms).filter(phrase => selectedIdioms[phrase]);
+    if (!phrasesToCreate.length) return;
+
+    setCreatingIdiomsStatus("Starting card creation...");
+
+    const bridgeOrigin = resolvedLocalBridgeOrigin(settings.localBridgeOrigin);
+    let successCount = 0;
+
+    for (let i = 0; i < phrasesToCreate.length; i++) {
+      const phrase = phrasesToCreate[i];
+      setCreatingIdiomsStatus(`Creating card for "${phrase}" (${i + 1}/${phrasesToCreate.length})...`);
+
+      try {
+        const response = await fetch(`${bridgeOrigin}/create-card`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...bridgeAuthorizationHeader(settings.bridgeApiToken),
+          },
+          body: JSON.stringify({ word: phrase, settings }),
+        });
+
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(payload.error || `Failed with status ${response.status}`);
+        }
+
+        if (response.body) {
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+          }
+        }
+
+        void prefetchEnglishAudio(phrase, settings).catch(() => undefined);
+        successCount++;
+      } catch (err) {
+        console.error(`Failed to create card for "${phrase}":`, err);
+        alert(`Error creating card for "${phrase}": ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    setCreatingIdiomsStatus(null);
+    setIdioms([]);
+    setSelectedIdioms({});
+
+    await refresh("manual");
+    alert(`Successfully created ${successCount} idiom cards!`);
+  };
+
   const handleFilterSearchCommandEnter = () => {
     const query = filters.query.trim();
-    if (!query || query.includes(",")) return;
+    if (!query) return;
+
+    if (searchMode === "idioms") {
+      void handleFindIdioms(query);
+      return;
+    }
+
+    if (query.includes(",")) return;
 
     if (contextListCards.length > 0) {
       const targetWord = selected?.word || contextListCards[0]?.word;
@@ -1725,14 +1902,131 @@ export function App() {
           </div>
         </header>
 
+        <div className="search-mode-container">
+          <button
+            className={`search-mode-button ${searchMode === "default" ? "active" : ""}`}
+            type="button"
+            onClick={() => {
+              setSearchMode("default");
+              setIdioms([]);
+              setIdiomError(null);
+              setHasSearchedIdioms(false);
+            }}
+          >
+            Default Dictionary
+          </button>
+          <button
+            className={`search-mode-button ${searchMode === "idioms" ? "active" : ""}`}
+            type="button"
+            onClick={() => setSearchMode("idioms")}
+          >
+            Idioms Generator
+          </button>
+        </div>
+
         <FilterBar
           filters={filters}
           topics={topics}
           partsOfSpeech={partsOfSpeech}
-          onChange={setFilters}
+          onChange={(nextFilters) => {
+            setFilters(nextFilters);
+            if (nextFilters.query.trim().toLowerCase() !== filters.query.trim().toLowerCase()) {
+              setIdioms([]);
+              setHasSearchedIdioms(false);
+              setIdiomError(null);
+            }
+          }}
           onClear={clearFilters}
           onCommandEnter={handleFilterSearchCommandEnter}
         />
+
+        {searchMode === "idioms" ? (
+          (loadingIdioms || idiomsWithExistsStatus.length > 0 || idiomError || creatingIdiomsStatus || hasSearchedIdioms) ? (
+            <div className="idioms-suggest-panel">
+              <div className="idioms-suggest-title">
+                {creatingIdiomsStatus ? "Creating Cards..." : `Suggested Idioms for "${filters.query}"`}
+              </div>
+              
+              {loadingIdioms ? (
+                <div className="notice" style={{ margin: "10px 0 0 0" }}>Loading idiom suggestions from AI...</div>
+              ) : idiomError ? (
+                <div className="notice error" style={{ margin: "10px 0 0 0" }}>{idiomError}</div>
+              ) : creatingIdiomsStatus ? (
+                <div className="notice" style={{ margin: "10px 0 0 0" }}>{creatingIdiomsStatus}</div>
+              ) : idiomsWithExistsStatus.length === 0 ? (
+                <div className="notice" style={{ margin: "10px 0 0 0" }}>No common idioms, phrasal verbs, or collocations found for "{filters.query}".</div>
+              ) : (
+                <>
+                  <div className="idioms-list">
+                    {idiomsWithExistsStatus.map((item) => (
+                      <label key={item.phrase} className="idiom-item" onClick={(e) => {
+                        if (item.exists) {
+                          e.preventDefault();
+                        }
+                      }}>
+                        <input
+                          type="checkbox"
+                          disabled={item.exists}
+                          checked={Boolean(item.exists || selectedIdioms[item.phrase])}
+                          onChange={(e) => {
+                            setSelectedIdioms(prev => ({
+                              ...prev,
+                              [item.phrase]: e.target.checked
+                            }));
+                          }}
+                        />
+                        <div className="idiom-info">
+                          <span className="idiom-phrase">{item.phrase}</span>
+                          <span className="idiom-meaning-vi">{item.meaningVi}</span>
+                          <span className="idiom-meaning-en">{item.meaningEn}</span>
+                        </div>
+                        {item.exists ? (
+                          <span className="idiom-badge exists">Already Added</span>
+                        ) : (
+                          <span className="idiom-badge">Suggest</span>
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                  <div className="idioms-actions">
+                    <button
+                      type="button"
+                      onClick={() => handleFindIdioms(filters.query)}
+                      disabled={loadingIdioms || !filters.query.trim()}
+                    >
+                      Refresh Suggestions
+                    </button>
+                    <button
+                      className="primary"
+                      type="button"
+                      onClick={handleCreateSelectedIdioms}
+                      disabled={!Object.values(selectedIdioms).some(Boolean)}
+                    >
+                      Save Selected ({Object.values(selectedIdioms).filter(Boolean).length})
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="idioms-suggest-panel" style={{ borderStyle: "solid", borderWidth: 1 }}>
+              <div className="idioms-suggest-title">Idioms Generator</div>
+              <p style={{ fontSize: 13, color: "var(--muted)", margin: "4px 0 8px 0", lineHeight: 1.4 }}>
+                Enter a keyword in the search box (e.g. "take", "give", "keep") and press Enter or click the button below to generate common idioms and collocations to learn.
+              </p>
+              <div className="idioms-actions" style={{ justifyContent: "flex-start", marginTop: 4 }}>
+                <button
+                  className="primary"
+                  type="button"
+                  onClick={() => handleFindIdioms(filters.query)}
+                  disabled={!filters.query.trim()}
+                >
+                  Find Idioms for "{filters.query || "keyword"}"
+                </button>
+              </div>
+            </div>
+          )
+        ) : null}
 
         {error ? <div className="notice error">{error}</div> : null}
         {loading ? (
@@ -1748,6 +2042,8 @@ export function App() {
             searchQuery={filters.query}
             createCardState={createCardState}
             onCreateMissing={createMissingCard}
+            searchMode={searchMode}
+            onFindIdioms={handleFindIdioms}
             onSelect={(card) => {
               if (globalAgentOpen && activeContextScope.mode === "custom") {
                 toggleCustomContextCard(card);
@@ -2549,6 +2845,8 @@ function CardList({
   searchQuery,
   createCardState,
   onCreateMissing,
+  searchMode,
+  onFindIdioms,
   onSelect,
 }: {
   cards: Card[];
@@ -2560,6 +2858,8 @@ function CardList({
   searchQuery: string;
   createCardState: CreateCardState;
   onCreateMissing: (word: string) => void;
+  searchMode?: "default" | "idioms";
+  onFindIdioms?: (word: string) => void;
   onSelect: (card: Card) => void;
 }) {
   const parentRef = useRef<HTMLDivElement | null>(null);
@@ -2610,18 +2910,26 @@ function CardList({
 
   if (!cards.length) {
     const candidate = searchQuery.trim();
-    const canCreate = Boolean(candidate && !candidate.includes(","));
+    const canCreate = Boolean(candidate);
     const isCreating = createCardState.status === "creating" && createCardState.word.toLowerCase() === candidate.toLowerCase();
     return (
       <div className="empty-list">
         <strong>No matching cards</strong>
         <span>Try a different word, topic, or part of speech.</span>
         {canCreate ? (
-          <button className="create-missing-card-button" type="button" onClick={() => onCreateMissing(candidate)} disabled={isCreating}>
-            {isCreating ? "Creating..." : `Create "${candidate}"`}
-          </button>
+          searchMode === "idioms" ? (
+            <button className="create-missing-card-button" type="button" onClick={() => onFindIdioms?.(candidate)}>
+              Find Idioms for "{candidate}"
+            </button>
+          ) : (
+            candidate.includes(",") ? null : (
+              <button className="create-missing-card-button" type="button" onClick={() => onCreateMissing(candidate)} disabled={isCreating}>
+                {isCreating ? "Creating..." : `Create "${candidate}"`}
+              </button>
+            )
+          )
         ) : null}
-        {createCardState.message ? (
+        {createCardState.message && searchMode !== "idioms" ? (
           <span className={`create-card-status ${createCardState.status === "error" ? "error" : ""}`}>{createCardState.message}</span>
         ) : null}
       </div>
