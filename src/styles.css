@@ -26,6 +26,7 @@
    */
   --accent-choice: color-mix(in srgb, var(--accent) 80%, #2563eb 20%);
   --accent-choice-soft: color-mix(in srgb, var(--accent-soft) 76%, rgb(219 234 254) 24%);
+  --headword-color: color-mix(in srgb, var(--accent) 30%, #d97706 70%);
   --reading-paper: #efe6d6;
   --reading-paper-soft: #e7dcc8;
   --reading-paper-ink: #2a241c;
@@ -35,6 +36,7 @@
 }
 
 html[data-theme="dark"] {
+  --headword-color: color-mix(in srgb, var(--accent) 30%, #f59e0b 70%);
   --reading-paper: #e9deca;
   --reading-paper-soft: #ded0b8;
   --reading-paper-ink: #241f19;
@@ -591,22 +593,25 @@ textarea:focus {
 
 .row-main strong {
   overflow: hidden;
-  font-family: var(--font-display);
-  font-size: 19px;
-  line-height: 1.12;
+  font-family: var(--font-reading);
+  font-weight: 700;
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1.15;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .row-main strong.medium-word {
-  font-size: 16px;
+  font-size: 17px;
 }
 
 .row-main strong.long-word {
-  font-size: 13.5px;
+  font-size: 14px;
   white-space: normal;
   word-break: break-word;
 }
+
 
 
 .row-main span,
@@ -652,22 +657,98 @@ textarea:focus {
   margin-top: 4px;
 }
 
+/* POS-based Theme Colors */
+.card-row {
+  --pos-color: #4b5563;
+  --pos-bg: #f3f4f6;
+}
+html[data-theme="dark"] .card-row {
+  --pos-color: #a3a3a3;
+  --pos-bg: #262626;
+}
+
+/* Verbs / Phrasal Verbs / Verb Phrases */
+.pos-theme-verb,
+.pos-theme-phrasal-verb,
+.pos-theme-verb-phrase {
+  --pos-color: #e11d48;
+  --pos-bg: #ffe4e6;
+}
+html[data-theme="dark"] .pos-theme-verb,
+html[data-theme="dark"] .pos-theme-phrasal-verb,
+html[data-theme="dark"] .pos-theme-verb-phrase {
+  --pos-color: #fb7185;
+  --pos-bg: #4c0519;
+}
+
+/* Nouns / Noun Phrases */
+.pos-theme-noun,
+.pos-theme-noun-phrase {
+  --pos-color: #2563eb;
+  --pos-bg: #dbeafe;
+}
+html[data-theme="dark"] .pos-theme-noun,
+html[data-theme="dark"] .pos-theme-noun-phrase {
+  --pos-color: #60a5fa;
+  --pos-bg: #1e3a8a;
+}
+
+/* Adjectives / Adjective Phrases */
+.pos-theme-adjective,
+.pos-theme-adjective-phrase {
+  --pos-color: #d97706;
+  --pos-bg: #fef3c7;
+}
+html[data-theme="dark"] .pos-theme-adjective,
+html[data-theme="dark"] .pos-theme-adjective-phrase {
+  --pos-color: #fbbf24;
+  --pos-bg: #78350f;
+}
+
+/* Adverbs / Adverb Phrases */
+.pos-theme-adverb,
+.pos-theme-adverb-phrase {
+  --pos-color: #7c3aed;
+  --pos-bg: #ede9fe;
+}
+html[data-theme="dark"] .pos-theme-adverb,
+html[data-theme="dark"] .pos-theme-adverb-phrase {
+  --pos-color: #c084fc;
+  --pos-bg: #4c1d95;
+}
+
+/* Idioms / Prepositions / Conjunctions / Others */
+.pos-theme-idiom,
+.pos-theme-preposition,
+.pos-theme-conjunction,
+.pos-theme-expression {
+  --pos-color: #0d9488;
+  --pos-bg: #ccfbf1;
+}
+html[data-theme="dark"] .pos-theme-idiom,
+html[data-theme="dark"] .pos-theme-preposition,
+html[data-theme="dark"] .pos-theme-conjunction,
+html[data-theme="dark"] .pos-theme-expression {
+  --pos-color: #2dd4bf;
+  --pos-bg: #115e59;
+}
+
 .pos-badge {
   display: inline-flex;
   align-items: center;
-  font-size: 8.5px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: 7.5px;
+  font-weight: 500;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
   background: transparent;
-  color: color-mix(in srgb, var(--muted) 75%, transparent);
+  color: var(--muted);
   border: 0;
   padding: 0;
   height: auto;
-  opacity: 0.8;
+  opacity: 0.7;
   
   /* Prevent long part of speech from pushing elements or wrapping */
-  max-width: 120px;
+  max-width: 100px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -683,11 +764,10 @@ textarea:focus {
 
 /* Meaning section with enhanced spacing and legibility */
 .row-meaning-container {
-  color: var(--ink);
-  opacity: 0.7;
-  font-size: 12px;
+  color: var(--pos-color);
+  font-size: 13px;
   font-style: italic;
-  font-weight: 400;
+  font-weight: 500;
   line-height: 1.45;
   margin-top: 6px;
   margin-bottom: 6px;
@@ -798,9 +878,11 @@ textarea:focus {
 .quick-preview-popover h3 {
   margin: 3px 0 4px;
   overflow-wrap: anywhere;
-  font-family: var(--font-display);
-  font-size: 24px;
-  line-height: 1.12;
+  font-family: var(--font-reading);
+  font-weight: 700;
+  color: var(--ink);
+  font-size: 25px;
+  line-height: 1.15;
 }
 
 .quick-preview-popover p {
@@ -877,9 +959,11 @@ textarea:focus {
 .viewer-header h2 {
   margin-top: 4px;
   overflow-wrap: anywhere;
-  font-family: var(--font-display);
-  font-size: 27px;
-  line-height: 1.1;
+  font-family: var(--font-reading);
+  font-weight: 700;
+  color: var(--ink);
+  font-size: 28px;
+  line-height: 1.15;
 }
 
 .viewer-tags {
