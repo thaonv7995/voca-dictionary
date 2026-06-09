@@ -1702,6 +1702,14 @@ export function App() {
     const query = filters.query.trim();
     if (!query) return;
 
+    if (contextListCards.length > 0) {
+      const targetWord = selected?.word || contextListCards[0]?.word;
+      if (targetWord) {
+        void speakEnglish(targetWord, settings);
+      }
+      return;
+    }
+
     if (searchMode === "idioms") {
       if (createCardState.status !== "creating") {
         void createMissingCard(query);
@@ -1711,16 +1719,9 @@ export function App() {
 
     if (query.includes(",")) return;
 
-    if (contextListCards.length > 0) {
-      const targetWord = selected?.word || contextListCards[0]?.word;
-      if (targetWord) {
-        void speakEnglish(targetWord, settings);
-      }
-    } else {
-      const exactExists = cards.some((c) => c.word.toLowerCase() === query.toLowerCase());
-      if (!exactExists && createCardState.status !== "creating") {
-        void createMissingCard(query);
-      }
+    const exactExists = cards.some((c) => c.word.toLowerCase() === query.toLowerCase());
+    if (!exactExists && createCardState.status !== "creating") {
+      void createMissingCard(query);
     }
   };
   const updateContextScope = (next: Partial<GlobalContextScope>) => {
