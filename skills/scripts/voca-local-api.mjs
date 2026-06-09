@@ -24,6 +24,7 @@ const MANIFEST_PATH = path.join(ROOT, "cards.json");
 const OUTPUT_DIR = path.join(ROOT, ".voca-output");
 const PRACTICE_ATTEMPTS_PATH = path.join(OUTPUT_DIR, "mobile-practice-attempts.jsonl");
 const CREATE_CARD_SCRIPT = path.join(SCRIPT_DIR, "voca-create-card.mjs");
+const CONFIG_PATH = path.join(ROOT, "voca-config.json");
 const PORT = Number(process.env.VOCA_LOCAL_API_PORT || 22053);
 const MAX_BODY_BYTES = 64 * 1024;
 const DEFAULT_VOCA_API_TOKEN = readSharedDefaultVocaApiToken();
@@ -229,6 +230,19 @@ async function fileExists(filePath) {
   } catch {
     return false;
   }
+}
+
+async function readServerConfig() {
+  try {
+    const raw = await fs.readFile(CONFIG_PATH, "utf8");
+    return JSON.parse(raw);
+  } catch {
+    return { searchMode: "default" };
+  }
+}
+
+async function writeServerConfig(config) {
+  await fs.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2), "utf8");
 }
 
 async function readManifestFile() {
@@ -1051,6 +1065,27 @@ async function handleV1Request(request, response, url) {
     await handleV1Health(request, response);
     return;
   }
+  if (request.method === "GET" && pathname === "/v1/settings") {
+    const config = await readServerConfig();
+    sendJson(request, response, 200, { searchMode: config.searchMode || "default" });
+    return;
+  }
+  if (request.method === "POST" && pathname === "/v1/settings") {
+    try {
+      const body = JSON.parse(await readBody(request));
+      const config = await readServerConfig();
+      if (body.searchMode === "default" || body.searchMode === "idioms") {
+        config.searchMode = body.searchMode;
+        await writeServerConfig(config);
+        sendJson(request, response, 200, { status: "ok", config });
+      } else {
+        sendApiError(request, response, 400, "INVALID_MODE", "Invalid searchMode. Must be 'default' or 'idioms'.");
+      }
+    } catch (error) {
+      sendApiError(request, response, 500, "INTERNAL_ERROR", error instanceof Error ? error.message : String(error));
+    }
+    return;
+  }
   if (request.method === "GET" && pathname === "/v1/sync/bootstrap") {
     await handleV1Bootstrap(request, response);
     return;
@@ -1110,24 +1145,17 @@ async function handleV1Request(request, response, url) {
     return;
   }
   if (pathname === "/v1/cards/create" && request.method === "POST") {
-    const body = JSON.parse(await readBody(request));
-    const word = normalizeWord(body.word);
-    if (!word) {
-      sendApiError(request, response, 400, "MISSING_WORD", "Missing word.");
-      return;
+    try {
+      const body = JSON.parse(await readBody(request));
+      await handleCreateCardRequest(request, response, body);
+    } catch (error) {
+      if (response.headersSent) {
+        writeEvent(response, { type: "error", message: error instanceof Error ? error.message : String(error) });
+        response.end();
+      } else {
+        sendJson(request, response, 500, { error: error instanceof Error ? error.message : String(error) });
+      }
     }
-    const settings = body.settings || serverLlmSettings();
-    if (!settings.apiKey || !settings.baseURL || !settings.model) {
-      sendApiError(request, response, 400, "LLM_NOT_CONFIGURED", "Server LLM settings are not configured.");
-      return;
-    }
-    streamHeaders(request, response);
-    const result = await runCreateCard({ word, settings, response });
-    const done = [...result.events].reverse().find((event) => event.type === "done");
-    if (!done) {
-      writeEvent(response, { type: "done", message: "Completed", copied: [], skipped: [], outputDir: undefined });
-    }
-    response.end();
     return;
   }
   if (pathname === "/v1/chat/completions" && request.method === "POST") {
@@ -1190,6 +1218,146 @@ function runCreateCard({ word, settings, response }) {
       reject(new Error(stderr || `voca-create-card failed with code ${code}`));
     });
   });
+}
+
+async function handleCreateCardRequest(request, response, body) {
+  const word = normalizeWord(body.word);
+  if (!word) {
+    sendApiError(request, response, 400, "MISSING_WORD", "Missing word.");
+    return;
+  }
+  const settings = body.settings || {};
+  const activeApiKey = settings.apiKey || process.env.VOCA_LLM_API_KEY || process.env.OPENAI_API_KEY;
+  const activeBaseURL = settings.baseURL || process.env.VOCA_LLM_BASE_URL || process.env.OPENAI_BASE_URL;
+  const activeModel = settings.model || process.env.VOCA_LLM_MODEL || process.env.OPENAI_MODEL;
+
+  if (!activeApiKey || !activeBaseURL || !activeModel) {
+    sendApiError(request, response, 400, "LLM_NOT_CONFIGURED", "Server LLM settings are not configured.");
+    return;
+  }
+
+  const resolvedSettings = {
+    apiKey: activeApiKey,
+    baseURL: activeBaseURL,
+    model: activeModel,
+  };
+
+  const config = await readServerConfig();
+  const searchMode = config.searchMode || "default";
+
+  if (searchMode === "idioms") {
+    streamHeaders(request, response);
+    writeEvent(response, { type: "progress", message: `AI is finding common idioms/collocations for "${word}"...` });
+    try {
+      const outboundSettings = normalizeOutboundSettings(resolvedSettings);
+      const endpoint = `${String(outboundSettings.baseURL).replace(/\/+$/, "")}/chat/completions`;
+      
+      const prompt = `Give me up to 3 of the most common idioms, phrasal verbs, or collocations that contain the word "${word}".
+Rules:
+- Only return high-frequency, highly practical phrases that are actually useful for TOEIC and daily English.
+- Ensure the phrases are distinct and cover different usage patterns. Do NOT return multiple phrases built on the exact same phrasal verb base (e.g. do not return "keep up with", "keep up appearances", and "keep up the good work" together. Instead, choose only one "keep up" variation, and find other patterns like "keep track of" or "keep in mind" for the remaining slots).
+- If there are fewer than 3 extremely common phrases, return only those (1 or 2).
+- If there are no common, useful, or natural idioms/phrasal verbs/collocations containing the word, return an empty array [].
+- Do NOT generate rare or unnatural phrases just to fill the list.
+
+Return ONLY a JSON object in this exact schema:
+{
+  "phrases": ["phrase 1", "phrase 2", "phrase 3"]
+}`;
+
+      const upstream = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${outboundSettings.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: outboundSettings.model,
+          stream: false,
+          messages: [
+            {
+              role: "system",
+              content: "You are a helpful TOEIC English dictionary assistant. You must return only a valid JSON object matching the requested schema.",
+            },
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+          response_format: { type: "json_object" },
+          temperature: 0.3,
+        }),
+      });
+
+      if (!upstream.ok) {
+        throw new Error(`LLM API returned error (${upstream.status})`);
+      }
+
+      const data = await upstream.json();
+      const choice = data.choices?.[0];
+      const aiContent = choice?.message?.content || "";
+      const parsed = JSON.parse(aiContent.trim());
+      const phrases = Array.isArray(parsed.phrases)
+        ? parsed.phrases.map((p) => String(p).trim()).filter(Boolean)
+        : [];
+
+      if (phrases.length === 0) {
+        writeEvent(response, { type: "error", message: `No common idioms found for "${word}".` });
+        response.end();
+        return;
+      }
+
+      let createdCount = 0;
+      const skipped = [];
+      const copied = [];
+
+      for (let i = 0; i < phrases.length; i++) {
+        const phrase = phrases[i];
+        writeEvent(response, {
+          type: "progress",
+          message: `Creating card for "${phrase}" (${i + 1}/${phrases.length})...`
+        });
+        try {
+          const result = await runCreateCard({ word: phrase, settings: resolvedSettings, response });
+          const doneEvent = [...result.events].reverse().find((event) => event.type === "done");
+          if (doneEvent) {
+            if (doneEvent.copied) copied.push(...doneEvent.copied);
+            if (doneEvent.skipped) skipped.push(...doneEvent.skipped);
+          }
+          createdCount++;
+        } catch (err) {
+          writeEvent(response, {
+            type: "log",
+            message: `Error creating card for "${phrase}": ${err.message}`
+          });
+        }
+      }
+
+      writeEvent(response, {
+        type: "done",
+        message: `Successfully created ${createdCount} idiom card(s)!`,
+        copied,
+        skipped
+      });
+      response.end();
+    } catch (err) {
+      writeEvent(response, { type: "error", message: err.message });
+      response.end();
+    }
+  } else {
+    streamHeaders(request, response);
+    try {
+      const result = await runCreateCard({ word, settings: resolvedSettings, response });
+      const done = [...result.events].reverse().find((event) => event.type === "done");
+      if (!done) {
+        writeEvent(response, { type: "done", message: "Completed", copied: [], skipped: [], outputDir: undefined });
+      }
+      response.end();
+    } catch (err) {
+      writeEvent(response, { type: "error", message: err.message });
+      response.end();
+    }
+  }
 }
 
 const server = createServer(async (request, response) => {
@@ -1263,31 +1431,7 @@ const server = createServer(async (request, response) => {
 
   try {
     const body = JSON.parse(await readBody(request));
-    const word = normalizeWord(body.word);
-    const settings = body.settings || {};
-    
-    const activeApiKey = settings.apiKey || process.env.VOCA_LLM_API_KEY || process.env.OPENAI_API_KEY;
-    const activeBaseURL = settings.baseURL || process.env.VOCA_LLM_BASE_URL || process.env.OPENAI_BASE_URL;
-    const activeModel = settings.model || process.env.VOCA_LLM_MODEL || process.env.OPENAI_MODEL || "gpt-4.1-mini";
-
-    if (!word) throw new Error("Missing word.");
-    if (!activeApiKey || !activeBaseURL || !activeModel) {
-      throw new Error("Missing AI settings.");
-    }
-
-    const resolvedSettings = {
-      apiKey: activeApiKey,
-      baseURL: activeBaseURL,
-      model: activeModel,
-    };
-    
-    streamHeaders(request, response);
-    const result = await runCreateCard({ word, settings: resolvedSettings, response });
-    const done = [...result.events].reverse().find((event) => event.type === "done");
-    if (!done) {
-      writeEvent(response, { type: "done", message: "Completed", copied: [], skipped: [], outputDir: undefined });
-    }
-    response.end();
+    await handleCreateCardRequest(request, response, body);
   } catch (error) {
     if (response.headersSent) {
       writeEvent(response, { type: "error", message: error instanceof Error ? error.message : String(error) });

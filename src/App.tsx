@@ -700,23 +700,6 @@ async function prefetchEnglishAudioUrl(text: string, settings: AiSettings, ttsMo
   return audioUrl;
 }
 
-async function prefetchEnglishAudio(text: string, settings?: AiSettings) {
-  const cleanText = text.trim();
-  if (!cleanText) return;
-  const apiSettings = settings?.useApiTts !== false && settings?.apiKey && (settings.ttsEndpoint || settings.baseURL) ? settings : null;
-  if (!apiSettings) return;
-  const bridgeOrigin = resolvedLocalBridgeOrigin(settings?.localBridgeOrigin);
-
-  await fetch(`${bridgeOrigin}/tts-cache`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...bridgeAuthorizationHeader(settings?.bridgeApiToken),
-    },
-    body: JSON.stringify({ text: cleanText, settings: apiSettings }),
-  });
-}
-
 function SpeakButton({ text, label, settings }: { text: string; label?: string; settings?: AiSettings }) {
   const [loading, setLoading] = useState(false);
   return (
@@ -1316,6 +1299,23 @@ export function App() {
     [storedSettings],
   );
 
+  const handleSettingsChange = (newSettings: AiSettings) => {
+    setSettings(newSettings);
+    if (newSettings.searchMode !== settings.searchMode) {
+      const bridgeOrigin = resolvedLocalBridgeOrigin(newSettings.localBridgeOrigin);
+      fetch(`${bridgeOrigin}/v1/settings`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...bridgeAuthorizationHeader(newSettings.bridgeApiToken),
+        },
+        body: JSON.stringify({ searchMode: newSettings.searchMode }),
+      }).catch((err) => {
+        console.error("Failed to save searchMode on server:", err);
+      });
+    }
+  };
+
   const searchMode = settings.searchMode || "default";
 
   /** Library levels come only from the manifest (cards.json via /cards.json or bridge /v1/cards)—no browser-only overrides. */
@@ -1368,6 +1368,29 @@ export function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+
+  useEffect(() => {
+    const fetchServerSettings = async () => {
+      try {
+        const bridgeOrigin = resolvedLocalBridgeOrigin(storedSettings.localBridgeOrigin);
+        const response = await fetch(`${bridgeOrigin}/v1/settings`, {
+          headers: bridgeAuthorizationHeader(storedSettings.bridgeApiToken),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data && (data.searchMode === "default" || data.searchMode === "idioms")) {
+            setSettings((prev) => {
+              if (prev.searchMode === data.searchMode) return prev;
+              return { ...prev, searchMode: data.searchMode };
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch server settings:", err);
+      }
+    };
+    void fetchServerSettings();
+  }, [storedSettings.localBridgeOrigin, storedSettings.bridgeApiToken]);
 
   useEffect(() => {
     if (selectedKey && !selected) {
@@ -1480,14 +1503,14 @@ export function App() {
     setCreateCardState({ word: normalizedWord, status: "creating", message: "Preparing card..." });
     const bridgeOrigin = resolvedLocalBridgeOrigin(settings.localBridgeOrigin);
 
-    const createSingleCard = async (targetWord: string) => {
+    try {
       const response = await fetch(`${bridgeOrigin}/create-card`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...bridgeAuthorizationHeader(settings.bridgeApiToken),
         },
-        body: JSON.stringify({ word: targetWord, settings }),
+        body: JSON.stringify({ word: normalizedWord, settings }),
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
@@ -1499,7 +1522,7 @@ export function App() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let skippedCount = 0;
+      let finalMessage = "";
       const handleLine = (line: string) => {
         const trimmed = line.trim();
         if (!trimmed) return;
@@ -1513,14 +1536,14 @@ export function App() {
           throw new Error(event.message || "Cannot create card.");
         }
         if (event.type === "done") {
-          skippedCount = event.skipped?.length || 0;
+          finalMessage = event.message || "Completed";
           return;
         }
         if (event.type === "progress" && event.message) {
           setCreateCardState({
             word: normalizedWord,
             status: "creating",
-            message: `[${targetWord}] ${event.message}`,
+            message: event.message,
           });
         }
       };
@@ -1538,95 +1561,14 @@ export function App() {
       buffer += decoder.decode();
       handleLine(buffer);
 
-      if (!skippedCount) {
-        void prefetchEnglishAudio(targetWord, settings).catch(() => undefined);
-      }
-      return skippedCount === 0;
-    };
+      setCreateCardState({
+        word: normalizedWord,
+        status: "done",
+        message: finalMessage || "Card creation complete.",
+      });
 
-    try {
-      if (searchMode === "idioms") {
-        setCreateCardState({ word: normalizedWord, status: "creating", message: "AI is finding common idioms/collocations..." });
-        
-        const prompt = `Give me up to 3 of the most common idioms, phrasal verbs, or collocations that contain the word "${normalizedWord}".
-Rules:
-- Only return high-frequency, highly practical phrases that are actually useful for TOEIC and daily English.
-- If there are fewer than 3 extremely common phrases, return only those (1 or 2).
-- If there are no common, useful, or natural idioms/phrasal verbs/collocations containing the word, return an empty array [].
-- Do NOT generate rare or unnatural phrases just to fill the list.
-
-Return ONLY a JSON object in this exact schema:
-{
-  "phrases": ["phrase 1", "phrase 2", "phrase 3"]
-}`;
-
-        const aiResponse = await fetchLlm(settings, {
-          model: settings.model,
-          stream: false,
-          messages: [
-            {
-              role: "system",
-              content: "You are a helpful TOEIC English dictionary assistant. You must return only a valid JSON object matching the requested schema.",
-            },
-            {
-              role: "user",
-              content: prompt,
-            },
-          ],
-          response_format: { type: "json_object" },
-          temperature: 0.3,
-        });
-
-        if (!aiResponse.ok) {
-          throw new Error(`AI API returned error (${aiResponse.status})`);
-        }
-
-        const aiData = await aiResponse.json();
-        const aiContent = extractLlmResponseText(aiData);
-        const parsed = JSON.parse(aiContent);
-        const phrases: string[] = Array.isArray(parsed.phrases) ? parsed.phrases.map((p: any) => String(p).trim()).filter(Boolean) : [];
-
-        if (phrases.length === 0) {
-          setCreateCardState({
-            word: normalizedWord,
-            status: "error",
-            message: `No common idioms found for "${normalizedWord}".`,
-          });
-          return;
-        }
-
-        let createdCount = 0;
-        for (let i = 0; i < phrases.length; i++) {
-          const phrase = phrases[i];
-          setCreateCardState({
-            word: normalizedWord,
-            status: "creating",
-            message: `Creating card for "${phrase}" (${i + 1}/${phrases.length})...`,
-          });
-          const created = await createSingleCard(phrase);
-          if (created) createdCount++;
-        }
-
-        setCreateCardState({
-          word: normalizedWord,
-          status: "done",
-          message: `Successfully created ${createdCount} idiom card(s)!`,
-        });
-        await refresh("manual");
-        if (phrases[0]) {
-          setFilters((current) => ({ ...current, query: phrases[0] }));
-        }
-      } else {
-        setCreateCardState({ word: normalizedWord, status: "creating", message: "Creating card..." });
-        const created = await createSingleCard(normalizedWord);
-        setCreateCardState({
-          word: normalizedWord,
-          status: "done",
-          message: created ? "Card created. Refreshing list..." : "Card already exists.",
-        });
-        await refresh("manual");
-        setFilters((current) => ({ ...current, query: normalizedWord }));
-      }
+      await refresh("manual");
+      setFilters((current) => ({ ...current, query: normalizedWord }));
     } catch (error) {
       setCreateCardState({
         word: normalizedWord,
@@ -1897,7 +1839,7 @@ Return ONLY a JSON object in this exact schema:
       {settingsOpen ? (
         <AppSettingsPanel
           settings={settings}
-          onSettingsChange={setSettings}
+          onSettingsChange={handleSettingsChange}
           onClose={() => setSettingsOpen(false)}
           cards={manifestCards}
           onRefresh={refresh}

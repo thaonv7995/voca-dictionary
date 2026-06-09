@@ -293,3 +293,51 @@ test("v1 API clears all cards and assets", async () => {
   });
 });
 
+test("v1 API GET/POST /v1/settings handles configuration persistence", async () => {
+  await withApiServer(async ({ origin, token }) => {
+    // 1. Initial check (should default to "default")
+    const getRes1 = await fetch(`${origin}/v1/settings`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(getRes1.status, 200);
+    const body1 = await getRes1.json();
+    assert.equal(body1.searchMode, "default");
+
+    // 2. Update to "idioms"
+    const postRes1 = await fetch(`${origin}/v1/settings`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ searchMode: "idioms" }),
+    });
+    assert.equal(postRes1.status, 200);
+    const postBody1 = await postRes1.json();
+    assert.equal(postBody1.status, "ok");
+    assert.equal(postBody1.config.searchMode, "idioms");
+
+    // 3. Verify get reflects update
+    const getRes2 = await fetch(`${origin}/v1/settings`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(getRes2.status, 200);
+    const body2 = await getRes2.json();
+    assert.equal(body2.searchMode, "idioms");
+
+    // 4. Update with invalid mode
+    const postRes2 = await fetch(`${origin}/v1/settings`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ searchMode: "invalid-mode-here" }),
+    });
+    assert.equal(postRes2.status, 400);
+    const postBody2 = await postRes2.json();
+    assert.equal(postBody2.error.code, "INVALID_MODE");
+  });
+});
+
+
