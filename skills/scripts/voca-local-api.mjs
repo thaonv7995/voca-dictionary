@@ -264,7 +264,7 @@ async function readServerConfig() {
     const raw = await fs.readFile(CONFIG_PATH, "utf8");
     return JSON.parse(raw);
   } catch {
-    return { searchMode: "default" };
+    return {};
   }
 }
 
@@ -1094,7 +1094,7 @@ async function handleV1Request(request, response, url) {
   }
   if (request.method === "GET" && pathname === "/v1/settings") {
     const config = await readServerConfig();
-    sendJson(request, response, 200, { searchMode: config.searchMode || "default" });
+    sendJson(request, response, 200, { searchMode: config.searchMode || null });
     return;
   }
   if (request.method === "POST" && pathname === "/v1/settings") {

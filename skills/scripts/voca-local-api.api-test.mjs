@@ -301,7 +301,7 @@ test("v1 API GET/POST /v1/settings handles configuration persistence", async () 
     });
     assert.equal(getRes1.status, 200);
     const body1 = await getRes1.json();
-    assert.equal(body1.searchMode, "default");
+    assert.equal(body1.searchMode, null);
 
     // 2. Update to "idioms"
     const postRes1 = await fetch(`${origin}/v1/settings`, {

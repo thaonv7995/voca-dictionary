@@ -9,6 +9,9 @@ import {
 } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
+  Activity,
+  CheckCircle2,
+  Clock,
   Download,
   Eye,
   ExternalLink,
@@ -25,6 +28,7 @@ import {
   Trash2,
   Volume2,
   X,
+  XCircle,
 } from "lucide-react";
 import { imagePath } from "./data/manifest";
 import {
@@ -94,6 +98,14 @@ type AiSettings = {
   /** Sent as Authorization: Bearer … for /v1/cards, PATCH level, create-card, and TTS cache. */
   bridgeApiToken: string;
   searchMode: "default" | "idioms";
+};
+
+type ActiveTask = {
+  id: string;
+  word: string;
+  status: "pending" | "processing" | "completed" | "failed";
+  message: string;
+  updatedAt: number;
 };
 
 type ChatMessage = {
@@ -1289,6 +1301,26 @@ export function App() {
   const [globalAgentOpen, setGlobalAgentOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [tasks, setTasks] = useState<ActiveTask[]>([]);
+  const [tasksOpen, setTasksOpen] = useState(false);
+  const tasksDropdownRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (tasksDropdownRef.current && !tasksDropdownRef.current.contains(event.target as Node)) {
+        setTasksOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const clearCompletedTasks = () => {
+    setTasks((prev) => prev.filter((t) => t.status === "processing"));
+  };
+
   const [contextScope, setContextScope] = useStoredState<GlobalContextScope>("voca.globalAgent.contextScope", defaultGlobalContextScope);
   const settings = useMemo(
     () => ({
@@ -1378,11 +1410,25 @@ export function App() {
         });
         if (response.ok) {
           const data = await response.json();
-          if (data && (data.searchMode === "default" || data.searchMode === "idioms")) {
-            setSettings((prev) => {
-              if (prev.searchMode === data.searchMode) return prev;
-              return { ...prev, searchMode: data.searchMode };
-            });
+          if (data) {
+            if (data.searchMode === "default" || data.searchMode === "idioms") {
+              setSettings((prev) => {
+                if (prev.searchMode === data.searchMode) return prev;
+                return { ...prev, searchMode: data.searchMode };
+              });
+            } else if (data.searchMode === null) {
+              // Server is uninitialized, initialize it with the client's current mode
+              void fetch(`${bridgeOrigin}/v1/settings`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  ...bridgeAuthorizationHeader(storedSettings.bridgeApiToken),
+                },
+                body: JSON.stringify({ searchMode: storedSettings.searchMode || "default" }),
+              }).catch((err) => {
+                console.error("Failed to initialize server settings:", err);
+              });
+            }
           }
         }
       } catch (err) {
@@ -1500,6 +1546,20 @@ export function App() {
       return;
     }
 
+    const mainTaskId = `task-${normalizedWord}-${Date.now()}`;
+    const searchModeIsIdioms = settings.searchMode === "idioms";
+    setTasks((prev) => [
+      ...prev,
+      {
+        id: mainTaskId,
+        word: searchModeIsIdioms ? `Idioms for "${normalizedWord}"` : normalizedWord,
+        status: "processing",
+        message: "Preparing...",
+        updatedAt: Date.now(),
+      },
+    ]);
+    setTasksOpen(true);
+
     setCreateCardState({ word: normalizedWord, status: "creating", message: "Preparing card..." });
     const bridgeOrigin = resolvedLocalBridgeOrigin(settings.localBridgeOrigin);
 
@@ -1545,6 +1605,38 @@ export function App() {
             status: "creating",
             message: event.message,
           });
+
+          const match = event.message.match(/^\[(.*?)\]\s*(.*)$/);
+          if (match) {
+            const taskWord = match[1];
+            const taskMsg = match[2];
+            setTasks((prev) => {
+              const taskIndex = prev.findIndex((t) => t.word === taskWord && t.status === "processing");
+              if (taskIndex >= 0) {
+                return prev.map((t, idx) =>
+                  idx === taskIndex ? { ...t, message: taskMsg, updatedAt: Date.now() } : t
+                );
+              } else {
+                return [
+                  ...prev,
+                  {
+                    id: `sub-${taskWord}-${Date.now()}`,
+                    word: taskWord,
+                    status: "processing",
+                    message: taskMsg,
+                    updatedAt: Date.now(),
+                  },
+                ];
+              }
+            });
+          } else {
+            const currentMsg = event.message || "";
+            setTasks((prev) =>
+              prev.map((t) =>
+                t.id === mainTaskId ? { ...t, message: currentMsg, updatedAt: Date.now() } : t
+              )
+            );
+          }
         }
       };
 
@@ -1567,19 +1659,42 @@ export function App() {
         message: finalMessage || "Card creation complete.",
       });
 
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === mainTaskId || (t.id.startsWith("sub-") && t.status === "processing")
+            ? { ...t, status: "completed", message: "Completed successfully!", updatedAt: Date.now() }
+            : t
+        )
+      );
+
       await refresh("manual");
       setFilters((current) => ({ ...current, query: normalizedWord }));
     } catch (error) {
+      const errMsg =
+        error instanceof Error && error.message.includes("Failed to fetch")
+          ? "Open or relaunch VocaMenuBar to enable card creation. Fallback: npm run voca:api."
+          : error instanceof Error
+            ? error.message
+            : "Cannot create card.";
+
       setCreateCardState({
         word: normalizedWord,
         status: "error",
-        message:
-          error instanceof Error && error.message.includes("Failed to fetch")
-            ? "Open or relaunch VocaMenuBar to enable card creation. Fallback: npm run voca:api."
-            : error instanceof Error
-              ? error.message
-              : "Cannot create card.",
+        message: errMsg,
       });
+
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === mainTaskId || (t.id.startsWith("sub-") && t.status === "processing")
+            ? {
+                ...t,
+                status: "failed",
+                message: error instanceof Error ? error.message : "Failed to create",
+                updatedAt: Date.now(),
+              }
+            : t
+        )
+      );
     }
   };
 
@@ -1726,6 +1841,58 @@ export function App() {
             >
               <Keyboard />
             </button>
+            <div className="task-indicator-container" ref={tasksDropdownRef}>
+              <button
+                className={`icon-button ${tasksOpen ? "active" : ""}`}
+                type="button"
+                onClick={() => setTasksOpen(!tasksOpen)}
+                aria-label="Active card generation tasks"
+                title="Active tasks"
+              >
+                {tasks.some((t) => t.status === "processing") ? (
+                  <Activity className="spin-icon" style={{ color: "var(--text-link)" }} />
+                ) : (
+                  <Activity />
+                )}
+                {tasks.filter((t) => t.status === "processing").length > 0 && (
+                  <span className="task-badge">{tasks.filter((t) => t.status === "processing").length}</span>
+                )}
+              </button>
+
+              {tasksOpen && (
+                <div className="tasks-dropdown-panel">
+                  <div className="tasks-dropdown-header">
+                    <h3>Generation Tasks</h3>
+                    {tasks.length > 0 && (
+                      <button className="clear-tasks-btn" onClick={clearCompletedTasks}>
+                        Clear Finished
+                      </button>
+                    )}
+                  </div>
+                  <div className="tasks-list">
+                    {tasks.length === 0 ? (
+                      <div className="tasks-empty">No active tasks.</div>
+                    ) : (
+                      [...tasks].reverse().map((task) => (
+                        <div className="task-item" key={task.id}>
+                          <div className={`task-icon ${task.status}`}>
+                            {task.status === "processing" && <Loader2 className="spin" size={14} />}
+                            {task.status === "completed" && <CheckCircle2 size={14} />}
+                            {task.status === "failed" && <XCircle size={14} />}
+                            {task.status === "pending" && <Clock size={14} />}
+                          </div>
+                          <div className="task-details">
+                            <span className="task-title" title={task.word}>{task.word}</span>
+                            <span className="task-msg" title={task.message}>{task.message}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <button
               className="icon-button"
               type="button"
