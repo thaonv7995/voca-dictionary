@@ -478,8 +478,7 @@ Rules:
 - Include 3-4 collocations/use cases.
 - Include 2-3 natural examples.
 - drawing must use plain printable text (use \n for newlines; do not output raw literal newlines inside JSON strings).
-- If a requested word appears misspelled, use the correct spelling as word and mention the spelling trap in toeicTrap.
-- For meaningVi, if the target is a phrase or collocation (has spaces), highlight the translation of the core keyword/verb inside the Vietnamese meaning by wrapping it in double asterisks (e.g., "**bù đắp**, đền bù" for "make up for", or "bày tỏ sự **thất vọng**" for "express frustration"). Do NOT wrap the entire meaning, only the translation of the core keyword/verb. If the target is a single word, you may optionally wrap the primary translation.`;
+- If a requested word appears misspelled, use the correct spelling as word and mention the spelling trap in toeicTrap.`;
 
   const payload = await requestModel(apiKey, prompt, words);
   const text = payload.output_text
