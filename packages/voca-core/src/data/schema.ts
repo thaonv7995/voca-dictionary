@@ -21,6 +21,7 @@ export const cardSchema = z.object({
   tags: z.array(z.string()).catch([]),
   createdAt: z.string().optional(),
   level: z.enum(["new", "learning", "known", "mastered"]).catch("new"),
+  keyword: z.string().optional(),
 });
 
 export type Card = z.infer<typeof cardSchema> & {

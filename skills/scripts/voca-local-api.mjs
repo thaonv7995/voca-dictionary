@@ -1196,7 +1196,7 @@ async function handleV1Request(request, response, url) {
   sendApiError(request, response, 404, "NOT_FOUND", "Not found.");
 }
 
-function runCreateCard({ word, settings, response, silentDone = false }) {
+function runCreateCard({ word, keyword, settings, response, silentDone = false }) {
   return new Promise((resolve, reject) => {
     const outboundSettings = normalizeOutboundSettings(settings);
     const child = spawn(process.execPath, [CREATE_CARD_SCRIPT, word], {
@@ -1206,6 +1206,7 @@ function runCreateCard({ word, settings, response, silentDone = false }) {
         OPENAI_API_KEY: outboundSettings.apiKey,
         OPENAI_BASE_URL: outboundSettings.baseURL,
         OPENAI_MODEL: outboundSettings.model,
+        VOCA_KEYWORD: keyword || word,
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -1355,6 +1356,7 @@ Return ONLY a JSON object in this exact schema:
           try {
             const result = await runCreateCard({
               word: phrase,
+              keyword: word,
               settings: resolvedSettings,
               response,
               silentDone: true,

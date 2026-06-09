@@ -485,6 +485,78 @@ function cardPronunciation(card: Card): string {
   return card.pronunciation || card.ipa || "";
 }
 
+function highlightExistingMeaningVi(word: string, meaningVi: string): string {
+  if (meaningVi.includes("**") || meaningVi.includes("<strong>") || meaningVi.includes("<b>")) {
+    return meaningVi;
+  }
+  
+  const lowerWord = word.toLowerCase();
+  
+  const mapping: Record<string, string[]> = {
+    "express frustration": ["thất vọng", "bực bội"],
+    "vent one's frustration": ["bực dọc", "thất vọng"],
+    "source of frustration": ["thất vọng"],
+    "make up for": ["bù đắp", "đền bù", "Bù đắp", "Đền bù"],
+    "make sure": ["đảm bảo", "chắc chắn"],
+    "make progress": ["tiến bộ", "tiến triển", "Tiến bộ", "Tiến triển"],
+    "eventually lead to": ["dẫn đến"],
+    "keep up with": ["theo kịp", "bắt kịp", "Theo kịp", "Bắt kịp"],
+    "keep track of": ["theo dõi", "ghi nhận", "Theo dõi", "Ghi nhận"],
+    "keep in mind": ["ghi nhớ", "lưu ý", "Ghi nhớ", "Lưu ý"],
+    "stood out": ["nổi bật", "Nổi bật"],
+    "water pooling": ["đọng nước", "tích tụ nước", "đọng", "tích tụ"],
+    "drainage issue": ["thoát nước"],
+    "proactive way": ["chủ động", "Chủ động"],
+    "bumble along": ["loay hoay", "lóng ngóng"],
+    "be wired to": ["kết nối", "định sẵn"],
+    "engaged with": ["tương tác", "tham gia"],
+  };
+  
+  for (const [key, targets] of Object.entries(mapping)) {
+    if (lowerWord.includes(key)) {
+      let result = meaningVi;
+      for (const target of targets) {
+        const escaped = target.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
+        const regex = new RegExp(`(${escaped})`, "g");
+        result = result.replace(regex, "**$1**");
+      }
+      return result;
+    }
+  }
+  
+  return meaningVi;
+}
+
+function renderMeaningText(meaning: string) {
+  if (!meaning) return null;
+  const regex = /\*\*(.*?)\*\*|<strong>(.*?)<\/strong>|<b>(.*?)<\/b>/g;
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+  
+  regex.lastIndex = 0;
+  
+  while ((match = regex.exec(meaning)) !== null) {
+    const matchIndex = match.index;
+    if (matchIndex > lastIndex) {
+      parts.push(meaning.substring(lastIndex, matchIndex));
+    }
+    const text = match[1] || match[2] || match[3];
+    parts.push(
+      <span key={matchIndex} className="meaning-keyword-highlight" style={{ color: "var(--pos-color)", fontWeight: 700 }}>
+        {text}
+      </span>
+    );
+    lastIndex = regex.lastIndex;
+  }
+  
+  if (lastIndex < meaning.length) {
+    parts.push(meaning.substring(lastIndex));
+  }
+  
+  return parts.length > 0 ? <>{parts}</> : <>{meaning}</>;
+}
+
 let activeSpeechAudio: HTMLAudioElement | null = null;
 let activeSpeechStop: (() => void) | null = null;
 const speechAudioUrlCache = new Map<string, string>();
@@ -2917,7 +2989,7 @@ function CardList({
 
                     {card.meaningVi ? (
                       <div className="row-meaning-container" title={card.meaningVi}>
-                        {card.meaningVi}
+                        {renderMeaningText(highlightExistingMeaningVi(card.word, card.meaningVi))}
                       </div>
                     ) : null}
 

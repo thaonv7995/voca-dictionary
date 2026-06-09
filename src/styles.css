@@ -764,10 +764,11 @@ html[data-theme="dark"] .pos-theme-expression {
 
 /* Meaning section with enhanced spacing and legibility */
 .row-meaning-container {
-  color: var(--pos-color);
+  color: var(--ink);
+  opacity: 0.7;
   font-size: 13px;
   font-style: italic;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.45;
   margin-top: 6px;
   margin-bottom: 6px;
