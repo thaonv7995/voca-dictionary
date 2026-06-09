@@ -2899,7 +2899,9 @@ function CardList({
                     <div className="card-top-row">
                       <span className="row-main">
                         <span className="row-title-line">
-                          <strong>{card.word}</strong>
+                          <strong className={card.word.length > 18 ? "long-word" : card.word.length > 12 ? "medium-word" : ""}>
+                            {card.word}
+                          </strong>
                           <SpeakButton text={card.word} settings={settings} />
                         </span>
                         <span className="row-meta-line">

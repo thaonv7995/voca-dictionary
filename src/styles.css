@@ -598,6 +598,17 @@ textarea:focus {
   white-space: nowrap;
 }
 
+.row-main strong.medium-word {
+  font-size: 16px;
+}
+
+.row-main strong.long-word {
+  font-size: 13.5px;
+  white-space: normal;
+  word-break: break-word;
+}
+
+
 .row-main span,
 .row-topic {
   overflow: hidden;
