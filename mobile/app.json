@@ -21,6 +21,10 @@
         "UIBackgroundModes": [
           "audio"
         ],
+        "NSCameraUsageDescription": "Chụp ảnh để scan từ vựng cần học.",
+        "NSPhotoLibraryUsageDescription": "Chọn ảnh để nhận diện từ vựng.",
+        "NSSpeechRecognitionUsageDescription": "Nhận dạng giọng nói để nhập từ vựng nhanh hơn.",
+        "NSMicrophoneUsageDescription": "Dùng mic để nhập từ bằng giọng nói.",
         "UIApplicationShortcutItems": [
           {
             "UIApplicationShortcutItemType": "com.voca.action.addWord",

@@ -1,22 +1,53 @@
 import { Link, useFocusEffect } from "expo-router";
 import React from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Animated,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { AddVocaModal } from "../../src/add-voca";
 import type { MobileCard } from "../../src/cards";
 import { useNetworkState } from "../../src/network";
-import { colors, spacing } from "../../src/theme";
-import { BodyText, PrimaryButton, SecondaryButton, SectionTitle, StatusPill } from "../../src/ui";
+import { colors, radius, shadows, spacing } from "../../src/theme";
+import {
+  BodyText,
+  Eyebrow,
+  LevelBadge,
+  PrimaryButton,
+  SecondaryButton,
+  SectionTitle,
+  StatusPill,
+} from "../../src/ui";
 import { defaultFilters, useCardsLibrary, useFilteredLibraryCards } from "../../src/useCards";
 
 type LevelKey = "new" | "learning" | "known" | "mastered";
 
-const levelLabels: Record<LevelKey, string> = {
-  new: "New",
-  learning: "Learning",
-  known: "Known",
-  mastered: "Mastered",
+const levelConfig: Record<LevelKey, { label: string; color: string; bg: string }> = {
+  new: { label: "New", color: colors.levelNew, bg: colors.levelNewBg },
+  learning: { label: "Learning", color: colors.levelLearning, bg: colors.levelLearningBg },
+  known: { label: "Known", color: colors.levelKnown, bg: colors.levelKnownBg },
+  mastered: { label: "Mastered", color: colors.levelMastered, bg: colors.levelMasteredBg },
 };
+
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return { text: "Good morning", emoji: "☀️" };
+  if (hour < 17) return { text: "Good afternoon", emoji: "🌤️" };
+  return { text: "Good evening", emoji: "🌙" };
+}
+
+function formatDate() {
+  return new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+}
 
 export default function TodayScreen() {
   const insets = useSafeAreaInsets();
@@ -32,11 +63,15 @@ export default function TodayScreen() {
   );
 
   const stats = React.useMemo(() => buildDashboardStats(cards), [cards]);
-  const dueCards = React.useMemo(() => cards.filter((card) => card.level === "new" || card.level === "learning"), [cards]);
-  const recentCards = React.useMemo(() => cards.slice(0, 5), [cards]);
+  const dueCards = React.useMemo(
+    () => cards.filter((card) => card.level === "new" || card.level === "learning"),
+    [cards],
+  );
+  const recentCards = React.useMemo(() => cards.slice(0, 3), [cards]);
 
   return (
     <SafeAreaView edges={[]} style={styles.safeRoot}>
+      {/* Page Header */}
       <View style={[styles.pageHeader, { paddingTop: insets.top + spacing.xs }]}>
         <View style={styles.pageHeaderMain}>
           <View style={styles.pageHeaderCopy}>
@@ -44,12 +79,13 @@ export default function TodayScreen() {
             <Text style={styles.pageSubtitle}>
               {refreshing
                 ? "Syncing library…"
-                : error
-                  ? "Sync issue — see below"
-                  : `${stats.total} words · ${dueCards.length} due`}
+                : `${stats.total} words · ${dueCards.length} due`}
             </Text>
           </View>
-          <StatusPill label={network.online ? network.label : "Offline"} tone={network.online ? "success" : "danger"} />
+          <StatusPill
+            label={network.online ? network.label : "Offline"}
+            tone={network.online ? "success" : "danger"}
+          />
         </View>
       </View>
 
@@ -57,18 +93,50 @@ export default function TodayScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl colors={[colors.accent]} onRefresh={() => void reload()} refreshing={refreshing} tintColor={colors.accent} />}
+        refreshControl={
+          <RefreshControl
+            colors={[colors.accent]}
+            onRefresh={() => void reload()}
+            refreshing={refreshing}
+            tintColor={colors.accent}
+          />
+        }
         showsVerticalScrollIndicator={false}
       >
-        <DashboardHero dueCount={dueCards.length} onAddVoca={() => setAddVocaOpen(true)} stats={stats} />
-        <LearningStatusPanel stats={stats} />
+        <GreetingBanner />
+        <DashboardHero
+          dueCount={dueCards.length}
+          onAddVoca={() => setAddVocaOpen(true)}
+          stats={stats}
+        />
         <RecentCardsPanel cards={recentCards} />
-        <SyncPanelCard error={error} offlineReady={offlineReady} refreshing={refreshing} snapshot={snapshot} />
       </ScrollView>
-      <AddVocaModal onClose={() => setAddVocaOpen(false)} onCreated={() => void reload()} visible={addVocaOpen} />
+
+      <AddVocaModal
+        onClose={() => setAddVocaOpen(false)}
+        onCreated={() => void reload()}
+        visible={addVocaOpen}
+      />
     </SafeAreaView>
   );
 }
+
+// ─── Greeting Banner ─────────────────────────────────────────────────────────
+
+function GreetingBanner() {
+  const { text, emoji } = getGreeting();
+  return (
+    <View style={styles.greetingBanner}>
+      <Text style={styles.greetingEmoji}>{emoji}</Text>
+      <View style={styles.greetingCopy}>
+        <Text style={styles.greetingText}>{text}</Text>
+        <Text style={styles.greetingDate}>{formatDate()}</Text>
+      </View>
+    </View>
+  );
+}
+
+// ─── Dashboard Hero ───────────────────────────────────────────────────────────
 
 function DashboardHero({
   stats,
@@ -81,25 +149,30 @@ function DashboardHero({
 }) {
   return (
     <View style={styles.heroShell}>
+      {/* Top row: title + mastery ring */}
       <View style={styles.heroTop}>
         <View style={styles.heroTitleBlock}>
-          <Text style={styles.heroEyebrow}>Library</Text>
-          <Text style={styles.heroTitle}>{stats.total} words</Text>
+          <Eyebrow>Library</Eyebrow>
+          <Text style={styles.heroTitle}>{stats.total}</Text>
+          <Text style={styles.heroTitleSub}>words</Text>
           <Text style={styles.heroSubtitle}>
-            {dueCount} due for review · {stats.createdToday} added today
+            {dueCount} due · {stats.createdToday} added today
           </Text>
         </View>
-        <View style={styles.ring}>
-          <Text style={styles.ringNumber}>{stats.masteryRate}%</Text>
-          <Text style={styles.ringLabel}>Mastery</Text>
-        </View>
+        <MasteryRing pct={stats.masteryRate} />
       </View>
+
+      {/* Inline stats */}
       <View style={styles.heroDivider} />
       <View style={styles.heroStats}>
-        <InlineStat label="Topics" value={stats.topics} />
-        <InlineStat label="Learning" value={stats.levels.learning} />
-        <InlineStat label="Known+" value={stats.levels.known + stats.levels.mastered} />
+        <InlineStat icon="🗂️" label="Topics" value={stats.topics} />
+        <View style={styles.heroStatsDivider} />
+        <InlineStat icon="📚" label="Learning" value={stats.levels.learning} />
+        <View style={styles.heroStatsDivider} />
+        <InlineStat icon="✅" label="Known+" value={stats.levels.known + stats.levels.mastered} />
       </View>
+
+      {/* Actions */}
       <View style={styles.heroActions}>
         <PrimaryButton label="Add Voca" onPress={onAddVoca} style={styles.heroActionBtn} />
         <Link href="/listen" asChild>
@@ -110,6 +183,38 @@ function DashboardHero({
   );
 }
 
+// ─── Mastery Ring ─────────────────────────────────────────────────────────────
+
+function MasteryRing({ pct }: { pct: number }) {
+  const scaleAnim = React.useRef(new Animated.Value(0.8)).current;
+  const opacityAnim = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    Animated.parallel([
+      Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, delay: 200, speed: 6, bounciness: 8 }),
+      Animated.timing(opacityAnim, { toValue: 1, duration: 400, useNativeDriver: true, delay: 100 }),
+    ]).start();
+  }, [scaleAnim, opacityAnim]);
+
+  const ringColor = pct >= 70 ? colors.levelMastered : pct >= 40 ? colors.accent : colors.levelLearning;
+
+  return (
+    <Animated.View
+      style={[
+        styles.ringOuter,
+        { borderColor: ringColor, transform: [{ scale: scaleAnim }], opacity: opacityAnim },
+      ]}
+    >
+      <View style={[styles.ringInner, { backgroundColor: ringColor + "18" }]}>
+        <Text style={[styles.ringNumber, { color: ringColor }]}>{pct}%</Text>
+        <Text style={styles.ringLabel}>Mastery</Text>
+      </View>
+    </Animated.View>
+  );
+}
+
+// ─── Learning Status Panel ────────────────────────────────────────────────────
+
 function LearningStatusPanel({ stats }: { stats: DashboardStats }) {
   return (
     <View style={styles.panel}>
@@ -118,30 +223,72 @@ function LearningStatusPanel({ stats }: { stats: DashboardStats }) {
           <SectionTitle>Learning status</SectionTitle>
           <BodyText>Words by level in your library.</BodyText>
         </View>
-        <Text style={styles.panelBadge}>{stats.masteryRate}%</Text>
+        <View style={[styles.masteryBadge, { backgroundColor: colors.accentSoft }]}>
+          <Text style={[styles.masteryBadgeText, { color: colors.accentStrong }]}>
+            {stats.masteryRate}%
+          </Text>
+        </View>
       </View>
       <View style={styles.levelList}>
-        {(Object.keys(levelLabels) as LevelKey[]).map((level) => {
+        {(Object.keys(levelConfig) as LevelKey[]).map((level) => {
           const pct = stats.total ? (stats.levels[level] / stats.total) * 100 : 0;
-          return (
-            <View key={level} style={styles.levelRow}>
-              <View style={styles.levelRowTop}>
-                <View style={styles.levelRowLabel}>
-                  <View style={[styles.levelDot, styles[`levelDot_${level}`]]} />
-                  <Text style={styles.levelLabel}>{levelLabels[level]}</Text>
-                </View>
-                <Text style={styles.levelCount}>{stats.levels[level]}</Text>
-              </View>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, styles[`progressFill_${level}`], { width: `${pct}%` }]} />
-              </View>
-            </View>
-          );
+          const { label, color, bg } = levelConfig[level];
+          return <LevelRow key={level} bg={bg} color={color} count={stats.levels[level]} label={label} pct={pct} />;
         })}
       </View>
     </View>
   );
 }
+
+function LevelRow({
+  label,
+  count,
+  pct,
+  color,
+  bg,
+}: {
+  label: string;
+  count: number;
+  pct: number;
+  color: string;
+  bg: string;
+}) {
+  const widthAnim = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    Animated.timing(widthAnim, {
+      toValue: pct,
+      duration: 800,
+      useNativeDriver: false,
+      delay: 300,
+    }).start();
+  }, [pct, widthAnim]);
+
+  const animatedWidth = widthAnim.interpolate({
+    inputRange: [0, 100],
+    outputRange: ["0%", "100%"],
+    extrapolate: "clamp",
+  });
+
+  return (
+    <View style={styles.levelRow}>
+      <View style={styles.levelRowTop}>
+        <View style={styles.levelRowLabel}>
+          <View style={[styles.levelDot, { backgroundColor: color }]} />
+          <Text style={styles.levelLabel}>{label}</Text>
+        </View>
+        <View style={[styles.levelCountBadge, { backgroundColor: bg }]}>
+          <Text style={[styles.levelCount, { color }]}>{count}</Text>
+        </View>
+      </View>
+      <View style={styles.progressTrack}>
+        <Animated.View style={[styles.progressFill, { backgroundColor: color, width: animatedWidth }]} />
+      </View>
+    </View>
+  );
+}
+
+// ─── Recent Cards Panel ───────────────────────────────────────────────────────
 
 function RecentCardsPanel({ cards }: { cards: MobileCard[] }) {
   return (
@@ -153,40 +300,73 @@ function RecentCardsPanel({ cards }: { cards: MobileCard[] }) {
         </View>
         <Link href="/(tabs)/cards" asChild>
           <Pressable style={styles.linkPill}>
-            <Text style={styles.linkPillText}>All cards</Text>
+            <Text style={styles.linkPillText}>All cards →</Text>
           </Pressable>
         </Link>
       </View>
       {cards.length ? (
         <View style={styles.recentList}>
           {cards.map((card) => (
-            <Link key={card.id} href={`/cards/${encodeURIComponent(card.id)}`} asChild>
-              <Pressable style={({ pressed }) => [styles.recentCard, pressed && styles.recentCardPressed]}>
-                <View style={[styles.recentStripe, styles[`recentStripe_${card.level}`]]} />
-                <View style={styles.recentCardInner}>
-                  <View style={styles.recentMark}>
-                    <Text style={styles.recentMarkText}>{card.word.slice(0, 1).toUpperCase()}</Text>
-                  </View>
-                  <View style={styles.recentCopy}>
-                    <Text numberOfLines={1} style={styles.recentWord}>
-                      {card.word}
-                    </Text>
-                    <Text numberOfLines={1} style={styles.recentMeta}>
-                      {[card.partOfSpeech, card.topic].filter(Boolean).join(" · ") || "—"}
-                    </Text>
-                  </View>
-                  <Text style={[styles.recentLevel, styles[`recentLevel_${card.level}`]]}>{card.level}</Text>
-                </View>
-              </Pressable>
-            </Link>
+            <RecentCardItem card={card} key={card.id} />
           ))}
         </View>
       ) : (
-        <BodyText>Add or sync vocabulary to see recent cards here.</BodyText>
+        <View style={styles.emptyPlaceholder}>
+          <Text style={styles.emptyPlaceholderIcon}>📖</Text>
+          <Text style={styles.emptyPlaceholderText}>Add or sync vocabulary to see recent cards here.</Text>
+        </View>
       )}
     </View>
   );
 }
+
+function RecentCardItem({ card }: { card: MobileCard }) {
+  const scaleAnim = React.useRef(new Animated.Value(1)).current;
+
+  function handlePressIn() {
+    Animated.spring(scaleAnim, { toValue: 0.97, useNativeDriver: true, speed: 50 }).start();
+  }
+  function handlePressOut() {
+    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, speed: 50 }).start();
+  }
+
+  const levelColor =
+    card.level === "new"
+      ? colors.levelNew
+      : card.level === "learning"
+        ? colors.levelLearning
+        : card.level === "known"
+          ? colors.levelKnown
+          : colors.levelMastered;
+
+  return (
+    <Link href={`/cards/${encodeURIComponent(card.id)}`} asChild>
+      <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut}>
+        <Animated.View style={[styles.recentCard, { transform: [{ scale: scaleAnim }] }]}>
+          <View style={[styles.recentStripe, { backgroundColor: levelColor }]} />
+          <View style={styles.recentCardInner}>
+            <View style={[styles.recentMark, { backgroundColor: levelColor + "22" }]}>
+              <Text style={[styles.recentMarkText, { color: levelColor }]}>
+                {card.word.slice(0, 1).toUpperCase()}
+              </Text>
+            </View>
+            <View style={styles.recentCopy}>
+              <Text numberOfLines={1} style={styles.recentWord}>
+                {card.word}
+              </Text>
+              <Text numberOfLines={1} style={styles.recentMeta}>
+                {[card.partOfSpeech, card.topic].filter(Boolean).join(" · ") || "—"}
+              </Text>
+            </View>
+            <LevelBadge level={card.level} />
+          </View>
+        </Animated.View>
+      </Pressable>
+    </Link>
+  );
+}
+
+// ─── Sync Panel ───────────────────────────────────────────────────────────────
 
 function SyncPanelCard({
   refreshing,
@@ -199,19 +379,19 @@ function SyncPanelCard({
   error: string;
   offlineReady: boolean;
 }) {
-  const dotStyle = error ? styles.syncDotDanger : offlineReady ? styles.syncDotReady : styles.syncDotNeutral;
+  const dotTone = error ? colors.danger : offlineReady ? colors.accent : colors.muted;
   const message = refreshing
     ? "Refreshing cards and pending changes…"
     : snapshot
-      ? `Offline cache from ${new Date(snapshot.updatedAt).toLocaleString()}`
+      ? `Cached: ${new Date(snapshot.updatedAt).toLocaleString()}`
       : "No cached cards yet. Open Settings and refresh when online.";
 
   return (
     <View style={[styles.panel, styles.syncPanel]}>
       <View style={styles.syncRow}>
-        <View style={[styles.syncDot, dotStyle]} />
+        <View style={[styles.syncDot, { backgroundColor: dotTone }]} />
         <View style={styles.syncTextBlock}>
-          <SectionTitle>Sync</SectionTitle>
+          <Text style={styles.syncTitle}>Sync</Text>
           <BodyText>{message}</BodyText>
         </View>
       </View>
@@ -220,9 +400,12 @@ function SyncPanelCard({
   );
 }
 
-function InlineStat({ label, value }: { label: string; value: number | string }) {
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function InlineStat({ icon, label, value }: { icon: string; label: string; value: number | string }) {
   return (
     <View style={styles.inlineStat}>
+      <Text style={styles.inlineStatIcon}>{icon}</Text>
       <Text style={styles.inlineStatValue}>{value}</Text>
       <Text style={styles.inlineStatLabel}>{label}</Text>
     </View>
@@ -252,35 +435,77 @@ function buildDashboardStats(cards: Array<{ level: string; topic: string; create
   };
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   safeRoot: { flex: 1, backgroundColor: colors.bg },
+
+  // Header
   pageHeader: {
     borderBottomWidth: 1,
-    borderBottomColor: colors.line,
-    paddingHorizontal: spacing.md,
+    borderBottomColor: colors.lineSoft,
+    paddingHorizontal: spacing.lg,
     paddingBottom: spacing.sm,
     backgroundColor: colors.panel,
+    ...shadows.sm,
   },
-  pageHeaderMain: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
-  pageHeaderCopy: { flex: 1, minWidth: 0, gap: 3 },
-  pageTitle: { color: colors.ink, fontSize: 22, fontWeight: "900" },
-  pageSubtitle: { color: colors.muted, fontSize: 12, fontWeight: "800" },
+  pageHeaderMain: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+  pageHeaderCopy: { flex: 1, minWidth: 0, gap: 2 },
+  pageTitle: {
+    color: colors.ink,
+    fontSize: 24,
+    fontWeight: "900",
+    letterSpacing: -0.5,
+  },
+  pageSubtitle: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
+  // Scroll
   scroll: { flex: 1 },
   scrollContent: {
     gap: spacing.md,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
-    paddingBottom: 40,
+    paddingBottom: 48,
     backgroundColor: colors.bg,
   },
 
+  // Greeting Banner
+  greetingBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.xs,
+  },
+  greetingEmoji: { fontSize: 24 },
+  greetingCopy: { flex: 1, gap: 1 },
+  greetingText: {
+    color: colors.ink,
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  greetingDate: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+
+  // Hero
   heroShell: {
     gap: spacing.md,
+    borderRadius: radius.xxl,
+    padding: spacing.lg,
+    backgroundColor: colors.panel,
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 14,
-    padding: spacing.md,
-    backgroundColor: colors.panel,
+    ...shadows.md,
   },
   heroTop: {
     flexDirection: "row",
@@ -288,72 +513,94 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: spacing.md,
   },
-  heroTitleBlock: { flex: 1, minWidth: 0 },
-  heroEyebrow: {
-    color: colors.accentStrong,
-    fontSize: 11,
-    fontWeight: "900",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
+  heroTitleBlock: { flex: 1, minWidth: 0, gap: 2 },
   heroTitle: {
     color: colors.ink,
-    fontSize: 32,
+    fontSize: 44,
     fontWeight: "900",
-    lineHeight: 38,
+    lineHeight: 48,
+    letterSpacing: -1,
     marginTop: 4,
+  },
+  heroTitleSub: {
+    color: colors.muted,
+    fontSize: 14,
+    fontWeight: "700",
+    marginTop: -4,
   },
   heroSubtitle: {
     color: colors.muted,
     fontSize: 13,
-    fontWeight: "700",
-    lineHeight: 18,
-    marginTop: 4,
+    fontWeight: "600",
+    marginTop: 6,
   },
-  ring: {
-    width: 76,
-    height: 76,
+
+  // Mastery Ring
+  ringOuter: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    borderWidth: 5,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 6,
-    borderColor: colors.accent,
-    borderRadius: 38,
-    backgroundColor: colors.panelSoft,
     flexShrink: 0,
   },
+  ringInner: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   ringNumber: {
-    color: colors.accentStrong,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "900",
+    letterSpacing: -0.5,
   },
   ringLabel: {
     color: colors.muted,
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: "900",
     textTransform: "uppercase",
-    marginTop: 2,
+    letterSpacing: 0.5,
+    marginTop: 1,
   },
-  heroDivider: { height: 1, backgroundColor: colors.line },
-  heroStats: { flexDirection: "row", justifyContent: "space-between", gap: spacing.sm },
-  inlineStat: { flex: 1, minWidth: 0 },
-  inlineStatValue: { color: colors.ink, fontSize: 18, fontWeight: "900" },
+
+  heroDivider: { height: 1, backgroundColor: colors.lineSoft },
+  heroStats: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+  },
+  heroStatsDivider: { width: 1, height: 32, backgroundColor: colors.lineSoft },
+  inlineStat: { flex: 1, alignItems: "center", gap: 2 },
+  inlineStatIcon: { fontSize: 16 },
+  inlineStatValue: {
+    color: colors.ink,
+    fontSize: 20,
+    fontWeight: "900",
+    letterSpacing: -0.5,
+  },
   inlineStatLabel: {
     color: colors.muted,
     fontSize: 10,
-    fontWeight: "900",
+    fontWeight: "700",
     textTransform: "uppercase",
-    marginTop: 2,
+    letterSpacing: 0.3,
   },
+
   heroActions: { flexDirection: "row", gap: spacing.sm },
   heroActionBtn: { flex: 1 },
 
+  // Panel
   panel: {
     gap: spacing.md,
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 14,
-    padding: spacing.md,
+    borderRadius: radius.xxl,
+    padding: spacing.lg,
     backgroundColor: colors.panel,
+    ...shadows.sm,
   },
   panelHeaderRow: {
     flexDirection: "row",
@@ -361,83 +608,98 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: spacing.md,
   },
-  panelHeaderCopy: { flex: 1, minWidth: 0, gap: 4 },
-  panelBadge: {
-    overflow: "hidden",
-    borderRadius: 999,
+  panelHeaderCopy: { flex: 1, minWidth: 0, gap: 3 },
+
+  masteryBadge: {
+    borderRadius: radius.full,
     paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    backgroundColor: colors.accentSoft,
-    color: colors.accentStrong,
-    fontSize: 12,
-    fontWeight: "900",
+    paddingVertical: 4,
     flexShrink: 0,
   },
+  masteryBadgeText: {
+    fontSize: 13,
+    fontWeight: "900",
+  },
+
   linkPill: {
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 999,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
     backgroundColor: colors.panelSoft,
     flexShrink: 0,
   },
   linkPillText: {
     color: colors.accentStrong,
     fontSize: 12,
+    fontWeight: "800",
+  },
+
+  // Level list
+  levelList: { gap: spacing.sm },
+  levelRow: { gap: 6 },
+  levelRowTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  levelRowLabel: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    flex: 1,
+    minWidth: 0,
+  },
+  levelDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    flexShrink: 0,
+  },
+  levelLabel: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  levelCountBadge: {
+    borderRadius: radius.full,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    flexShrink: 0,
+  },
+  levelCount: {
+    fontSize: 12,
     fontWeight: "900",
   },
-
-  levelList: { gap: spacing.md },
-  levelRow: { gap: 6 },
-  levelRowTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  levelRowLabel: { flexDirection: "row", alignItems: "center", gap: spacing.xs, flex: 1, minWidth: 0 },
-  levelDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
-  levelDot_new: { backgroundColor: colors.muted },
-  levelDot_learning: { backgroundColor: "#d97706" },
-  levelDot_known: { backgroundColor: colors.accentStrong },
-  levelDot_mastered: { backgroundColor: "#16a34a" },
-  levelLabel: { color: colors.ink, fontSize: 14, fontWeight: "900" },
-  levelCount: { color: colors.muted, fontSize: 14, fontWeight: "900" },
   progressTrack: {
-    height: 6,
+    height: 7,
     overflow: "hidden",
-    borderRadius: 999,
+    borderRadius: radius.full,
     backgroundColor: colors.panelSoft,
   },
-  progressFill: { height: "100%", borderRadius: 999 },
-  progressFill_new: { backgroundColor: colors.muted },
-  progressFill_learning: { backgroundColor: "#f59e0b" },
-  progressFill_known: { backgroundColor: colors.accent },
-  progressFill_mastered: { backgroundColor: "#16a34a" },
-
-  recentList: {
-    gap: spacing.sm,
+  progressFill: {
+    height: "100%",
+    borderRadius: radius.full,
+    minWidth: 4,
   },
+
+  // Recent cards
+  recentList: { gap: spacing.xs },
   recentCard: {
     flexDirection: "row",
     alignItems: "stretch",
-    alignSelf: "stretch",
-    minHeight: 72,
     borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 14,
+    borderColor: colors.lineSoft,
+    borderRadius: radius.lg,
     backgroundColor: colors.panelSoft,
     overflow: "hidden",
-  },
-  recentCardPressed: {
-    opacity: 0.88,
-    backgroundColor: colors.panel,
+    ...shadows.sm,
   },
   recentStripe: {
-    width: 4,
+    width: 5,
     flexShrink: 0,
-    backgroundColor: colors.accent,
   },
-  recentStripe_new: { backgroundColor: colors.muted },
-  recentStripe_learning: { backgroundColor: "#d97706" },
-  recentStripe_known: { backgroundColor: colors.accentStrong },
-  recentStripe_mastered: { backgroundColor: "#16a34a" },
   recentCardInner: {
     flex: 1,
     flexDirection: "row",
@@ -446,50 +708,71 @@ const styles = StyleSheet.create({
     minWidth: 0,
     paddingVertical: spacing.sm,
     paddingRight: spacing.md,
+    paddingLeft: spacing.sm,
   },
   recentMark: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 12,
-    backgroundColor: colors.accentSoft,
+    borderRadius: radius.md,
     flexShrink: 0,
   },
   recentMarkText: {
-    color: colors.accentStrong,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "900",
   },
   recentCopy: { flex: 1, minWidth: 0 },
-  recentWord: { color: colors.ink, fontSize: 16, fontWeight: "900" },
-  recentMeta: { color: colors.muted, fontSize: 12, fontWeight: "700", marginTop: 3 },
-  recentLevel: {
-    overflow: "hidden",
-    borderRadius: 999,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 5,
-    fontSize: 10,
-    fontWeight: "900",
-    textTransform: "uppercase",
-    flexShrink: 0,
-    backgroundColor: colors.panelSoft,
-    color: colors.muted,
+  recentWord: {
+    color: colors.ink,
+    fontSize: 15,
+    fontWeight: "800",
   },
-  recentLevel_new: {
-    backgroundColor: colors.panelSoft,
+  recentMeta: {
     color: colors.muted,
+    fontSize: 11,
+    fontWeight: "600",
+    marginTop: 2,
   },
-  recentLevel_learning: { backgroundColor: "#fff2d6", color: "#9b5d00" },
-  recentLevel_known: { backgroundColor: colors.accentSoft, color: colors.accentStrong },
-  recentLevel_mastered: { backgroundColor: "#dcfce7", color: "#166534" },
 
-  syncPanel: { backgroundColor: colors.panelSoft },
-  syncRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
-  syncDot: { width: 10, height: 10, marginTop: 6, borderRadius: 5, flexShrink: 0 },
-  syncDotReady: { backgroundColor: colors.accent },
-  syncDotDanger: { backgroundColor: colors.danger },
-  syncDotNeutral: { backgroundColor: colors.muted },
-  syncTextBlock: { flex: 1, minWidth: 0, gap: 4 },
-  errorText: { color: colors.danger, fontSize: 13, fontWeight: "800", marginTop: spacing.sm },
+  // Empty placeholder
+  emptyPlaceholder: {
+    alignItems: "center",
+    paddingVertical: spacing.xl,
+    gap: spacing.sm,
+  },
+  emptyPlaceholderIcon: { fontSize: 36 },
+  emptyPlaceholderText: {
+    color: colors.muted,
+    fontSize: 14,
+    fontWeight: "500",
+    textAlign: "center",
+    lineHeight: 21,
+  },
+
+  // Sync
+  syncPanel: {
+    backgroundColor: colors.panelSoft,
+    borderStyle: "dashed",
+  },
+  syncRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
+  syncDot: {
+    width: 8,
+    height: 8,
+    marginTop: 7,
+    borderRadius: 4,
+    flexShrink: 0,
+  },
+  syncTextBlock: { flex: 1, minWidth: 0, gap: 3 },
+  syncTitle: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  errorText: {
+    color: colors.danger,
+    fontSize: 13,
+    fontWeight: "700",
+    marginTop: spacing.xs,
+  },
 });

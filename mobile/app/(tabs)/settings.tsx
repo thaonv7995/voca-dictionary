@@ -1,5 +1,10 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
+import * as Clipboard from "expo-clipboard";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ActivityIndicator, Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  ActivityIndicator, Animated, Easing, Modal, Pressable,
+  ScrollView, StyleSheet, Text, TextInput, View,
+} from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { clearAudioCache } from "../../src/audio";
 import { clearCardImageCache } from "../../src/cards";
@@ -22,25 +27,21 @@ import {
   type ApiSettings,
 } from "../../src/settings";
 import { flushPendingSync, loadPendingSyncSummary, type PendingSyncSummary } from "../../src/sync";
-import { colors, spacing } from "../../src/theme";
-import { BodyText, PrimaryButton, SecondaryButton, SectionTitle, StatusPill } from "../../src/ui";
+import { colors, radius, shadows, spacing } from "../../src/theme";
+import { StatusPill } from "../../src/ui";
 
-type CheckState = {
-  status: "idle" | "checking" | "success" | "error";
-  message: string;
-};
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+type CheckState = { status: "idle" | "checking" | "success" | "error"; message: string };
+
+// ─── Main screen ─────────────────────────────────────────────────────────────
 
 export default function SettingsTabScreen() {
   const insets = useSafeAreaInsets();
   const network = useNetworkState();
   const [settings, setSettings] = useState<ApiSettings>({
-    baseUrl: "",
-    token: "",
-    llmBaseUrl: "",
-    llmApiKey: "",
-    llmModel: "",
-    ttsEndpoint: "",
-    ttsModel: defaultTtsModel,
+    baseUrl: "", token: "", llmBaseUrl: "", llmApiKey: "", llmModel: "",
+    ttsEndpoint: "", ttsModel: defaultTtsModel,
     conversationVoiceA: defaultTtsModel,
     conversationVoiceB: defaultConversationVoiceB,
     conversationVoiceC: defaultConversationVoiceC,
@@ -57,16 +58,17 @@ export default function SettingsTabScreen() {
   const [errors, setErrors] = useState<ClientErrorLog[]>([]);
 
   useEffect(() => {
-    Promise.all([loadApiSettings(), loadAudioWifiOnly(), loadNonStopListeningEnabled(), loadNonStopPreloadCount(), loadPendingSyncSummary(), loadClientErrors()])
-      .then(([apiSettings, wifiOnly, nonStop, preloadCount, pendingSummary, errorLog]) => {
-        setSettings(apiSettings);
-        setAudioWifiOnly(wifiOnly);
-        setNonStopEnabled(nonStop);
-        setNonStopPreloadCount(preloadCount);
-        setPending(pendingSummary);
-        setErrors(errorLog);
-      })
-      .finally(() => setLoading(false));
+    Promise.all([
+      loadApiSettings(), loadAudioWifiOnly(), loadNonStopListeningEnabled(),
+      loadNonStopPreloadCount(), loadPendingSyncSummary(), loadClientErrors(),
+    ]).then(([api, wifi, nonStop, preload, pendingSync, errLog]) => {
+      setSettings(api);
+      setAudioWifiOnly(wifi);
+      setNonStopEnabled(nonStop);
+      setNonStopPreloadCount(preload);
+      setPending(pendingSync);
+      setErrors(errLog);
+    }).finally(() => setLoading(false));
   }, []);
 
   async function saveAndCheck() {
@@ -83,18 +85,16 @@ export default function SettingsTabScreen() {
     }
   }
 
+  const isSaving = checkState.status === "checking";
+
   if (loading) {
     return (
-      <SafeAreaView edges={[]} style={styles.safeRoot}>
-        <View style={[styles.pageHeader, { paddingTop: insets.top + spacing.xs }]}>
-          <View style={styles.pageHeaderMain}>
-            <View style={styles.pageHeaderCopy}>
-              <Text style={styles.pageTitle}>Settings</Text>
-            </View>
-            <StatusPill label={network.online ? network.label : "Offline"} tone={network.online ? "success" : "danger"} />
-          </View>
+      <SafeAreaView edges={[]} style={styles.root}>
+        <View style={[styles.header, { paddingTop: insets.top + spacing.xs }]}>
+          <Text style={styles.pageTitle}>Settings</Text>
+          <StatusPill label={network.online ? network.label : "Offline"} tone={network.online ? "success" : "danger"} />
         </View>
-        <View style={styles.loading}>
+        <View style={styles.loadingCenter}>
           <ActivityIndicator color={colors.accent} size="large" />
         </View>
       </SafeAreaView>
@@ -102,191 +102,141 @@ export default function SettingsTabScreen() {
   }
 
   return (
-    <SafeAreaView edges={[]} style={styles.safeRoot}>
-      <View style={[styles.pageHeader, { paddingTop: insets.top + spacing.xs }]}>
-        <View style={styles.pageHeaderMain}>
-          <View style={styles.pageHeaderCopy}>
-            <Text style={styles.pageTitle}>Settings</Text>
-            <Text style={styles.pageSubtitle}>Providers, voice & sync</Text>
-          </View>
-          <StatusPill label={network.online ? network.label : "Offline"} tone={network.online ? "success" : "danger"} />
+    <SafeAreaView edges={[]} style={styles.root}>
+      {/* ── Header ── */}
+      <View style={[styles.header, { paddingTop: insets.top + spacing.xs }]}>
+        <View style={styles.headerLeft}>
+          <Text style={styles.pageTitle}>Settings</Text>
+          <Text style={styles.pageSubtitle}>API · Voice · Storage</Text>
         </View>
+        <StatusPill label={network.online ? network.label : "Offline"} tone={network.online ? "success" : "danger"} />
       </View>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        style={styles.scroll}
       >
-        <View style={styles.panel}>
-          <View style={styles.sectionHead}>
-            <Text style={styles.eyebrow}>Bridge</Text>
-            <SectionTitle>Voca API</SectionTitle>
-            <BodyText>Endpoint and shared token for the mobile cloud bridge.</BodyText>
-          </View>
-          <Field label="Base URL">
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              onChangeText={(baseUrl) => setSettings((current) => ({ ...current, baseUrl }))}
-              placeholder="https://voca-api.example.com"
-              placeholderTextColor={colors.muted}
-              style={styles.input}
-              value={settings.baseUrl}
-            />
-          </Field>
-          <Field label="API token">
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              onChangeText={(token) => setSettings((current) => ({ ...current, token }))}
-              placeholder="Shared Voca API token"
-              placeholderTextColor={colors.muted}
-              secureTextEntry
-              style={styles.input}
-              value={settings.token}
-            />
-          </Field>
-          <PrimaryButton
-            disabled={checkState.status === "checking"}
-            label={checkState.status === "checking" ? "Checking…" : "Save & test connection"}
+
+        {/* ── SECTION: Voca API ── */}
+        <SettingsSection
+          icon="cloud-outline"
+          iconColor="#3B82F6"
+          title="Voca API"
+          subtitle="Bridge endpoint & token"
+        >
+          <InputRow
+            label="Base URL"
+            placeholder="https://voca-api.example.com"
+            keyboardType="url"
+            value={settings.baseUrl}
+            onChangeText={(baseUrl) => setSettings((s) => ({ ...s, baseUrl }))}
+          />
+          <InputRow
+            label="API Token"
+            placeholder="Shared Voca API token"
+            secure
+            value={settings.token}
+            onChangeText={(token) => setSettings((s) => ({ ...s, token }))}
+            isLast
+          />
+          <SaveRow
+            isSaving={isSaving}
+            checkState={checkState}
             onPress={saveAndCheck}
           />
-          {checkState.message ? (
-            <Text style={[styles.feedback, checkState.status === "error" ? styles.feedbackError : styles.feedbackOk]}>
-              {checkState.message}
-            </Text>
-          ) : null}
-        </View>
+        </SettingsSection>
 
-        <View style={styles.panel}>
-          <View style={styles.sectionHead}>
-            <Text style={styles.eyebrow}>LLM</Text>
-            <SectionTitle>Model provider</SectionTitle>
-            <BodyText>Used for create-card, agent, and practice streams (same as web).</BodyText>
-          </View>
-          <Field label="Base URL">
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              onChangeText={(llmBaseUrl) => setSettings((current) => ({ ...current, llmBaseUrl }))}
-              placeholder="https://api.openai.com/v1"
-              placeholderTextColor={colors.muted}
-              style={styles.input}
-              value={settings.llmBaseUrl}
-            />
-          </Field>
-          <Field label="API key">
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              onChangeText={(llmApiKey) => setSettings((current) => ({ ...current, llmApiKey }))}
-              placeholder="Provider key"
-              placeholderTextColor={colors.muted}
-              secureTextEntry
-              style={styles.input}
-              value={settings.llmApiKey}
-            />
-          </Field>
-          <Field label="Model">
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              onChangeText={(llmModel) => setSettings((current) => ({ ...current, llmModel }))}
-              placeholder="gpt-4.1-mini"
-              placeholderTextColor={colors.muted}
-              style={styles.input}
-              value={settings.llmModel}
-            />
-          </Field>
-        </View>
+        {/* ── SECTION: LLM Provider ── */}
+        <SettingsSection
+          icon="hardware-chip-outline"
+          iconColor="#8B5CF6"
+          title="AI Model"
+          subtitle="LLM provider for agent & cards"
+        >
+          <InputRow
+            label="Base URL"
+            placeholder="https://api.openai.com/v1"
+            keyboardType="url"
+            value={settings.llmBaseUrl}
+            onChangeText={(llmBaseUrl) => setSettings((s) => ({ ...s, llmBaseUrl }))}
+          />
+          <InputRow
+            label="API Key"
+            placeholder="sk-…"
+            secure
+            value={settings.llmApiKey}
+            onChangeText={(llmApiKey) => setSettings((s) => ({ ...s, llmApiKey }))}
+          />
+          <InputRow
+            label="Model"
+            placeholder="gpt-4.1-mini"
+            value={settings.llmModel}
+            onChangeText={(llmModel) => setSettings((s) => ({ ...s, llmModel }))}
+          />
+          <SaveRow
+            isSaving={isSaving}
+            checkState={checkState}
+            onPress={saveAndCheck}
+          />
+        </SettingsSection>
 
-        <View style={styles.panel}>
-          <View style={styles.rowTitle}>
-            <View style={styles.sectionHeadFlat}>
-              <Text style={styles.eyebrow}>Speech</Text>
-              <SectionTitle>Voice & TTS</SectionTitle>
-            </View>
+        {/* ── SECTION: Voice & TTS ── */}
+        <SettingsSection
+          icon="mic-outline"
+          iconColor="#10B981"
+          title="Voice & TTS"
+          subtitle="Speech synthesis settings"
+          headerRight={
             <TogglePill
               active={settings.useApiTts}
-              label={settings.useApiTts ? "API TTS on" : "API TTS off"}
-              onPress={() => setSettings((current) => ({ ...current, useApiTts: !current.useApiTts }))}
+              label={settings.useApiTts ? "API TTS" : "Off"}
+              onPress={() => setSettings((s) => ({ ...s, useApiTts: !s.useApiTts }))}
             />
-          </View>
-          <BodyText>Card audio and speech generation use these endpoints when enabled.</BodyText>
-          <Field label="Speech endpoint">
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              onChangeText={(ttsEndpoint) => setSettings((current) => ({ ...current, ttsEndpoint }))}
-              placeholder="Optional — else base URL + /audio/speech"
-              placeholderTextColor={colors.muted}
-              style={styles.input}
-              value={settings.ttsEndpoint}
-            />
-          </Field>
-          <Field label="Voice model">
-            <VoicePicker
-              sheetTitle="Voice model"
-              onChange={(ttsModel) => setSettings((current) => ({ ...current, ttsModel }))}
-              value={settings.ttsModel}
-            />
-          </Field>
-          <PrimaryButton
-            disabled={checkState.status === "checking"}
-            label="Save provider settings"
-            onPress={saveAndCheck}
+          }
+        >
+          <InputRow
+            label="Speech Endpoint"
+            placeholder="Optional — defaults to base URL + /audio/speech"
+            keyboardType="url"
+            value={settings.ttsEndpoint}
+            onChangeText={(ttsEndpoint) => setSettings((s) => ({ ...s, ttsEndpoint }))}
           />
-        </View>
+          <VoicePickerRow
+            label="Voice Model"
+            sheetTitle="Voice model"
+            value={settings.ttsModel}
+            onChange={(ttsModel) => setSettings((s) => ({ ...s, ttsModel }))}
+            isLast
+          />
+        </SettingsSection>
 
-        <View style={styles.panel}>
-          <View style={styles.rowTitle}>
-            <View style={styles.sectionHeadFlat}>
-              <Text style={styles.eyebrow}>Listen</Text>
-              <SectionTitle>Conversation voices</SectionTitle>
-            </View>
+        {/* ── SECTION: Conversation voices ── */}
+        <SettingsSection
+          icon="people-outline"
+          iconColor="#F59E0B"
+          title="Conversation Voices"
+          subtitle="Speakers A / B / C"
+          headerRight={
             <TogglePill
               active={settings.conversationAutoSelectVoices}
               label={settings.conversationAutoSelectVoices ? "Auto" : "Manual"}
-              onPress={() =>
-                setSettings((current) => ({ ...current, conversationAutoSelectVoices: !current.conversationAutoSelectVoices }))
-              }
+              onPress={() => setSettings((s) => ({ ...s, conversationAutoSelectVoices: !s.conversationAutoSelectVoices }))}
             />
-          </View>
-          <BodyText>Speaker lines A / B / C in generated conversations.</BodyText>
-          <Field label="Voice A">
-            <VoicePicker
-              sheetTitle="Voice A"
-              onChange={(conversationVoiceA) => setSettings((current) => ({ ...current, conversationVoiceA }))}
-              value={settings.conversationVoiceA}
-            />
-          </Field>
-          <Field label="Voice B">
-            <VoicePicker
-              sheetTitle="Voice B"
-              onChange={(conversationVoiceB) => setSettings((current) => ({ ...current, conversationVoiceB }))}
-              value={settings.conversationVoiceB}
-            />
-          </Field>
-          <Field label="Voice C">
-            <VoicePicker
-              sheetTitle="Voice C"
-              onChange={(conversationVoiceC) => setSettings((current) => ({ ...current, conversationVoiceC }))}
-              value={settings.conversationVoiceC}
-            />
-          </Field>
-        </View>
+          }
+        >
+          <VoicePickerRow label="Voice A" sheetTitle="Voice A" value={settings.conversationVoiceA} onChange={(v) => setSettings((s) => ({ ...s, conversationVoiceA: v }))} />
+          <VoicePickerRow label="Voice B" sheetTitle="Voice B" value={settings.conversationVoiceB} onChange={(v) => setSettings((s) => ({ ...s, conversationVoiceB: v }))} />
+          <VoicePickerRow label="Voice C" sheetTitle="Voice C" value={settings.conversationVoiceC} onChange={(v) => setSettings((s) => ({ ...s, conversationVoiceC: v }))} isLast />
+        </SettingsSection>
 
-        <View style={styles.panel}>
-          <View style={styles.rowTitle}>
-            <View style={styles.sectionHeadFlat}>
-              <Text style={styles.eyebrow}>Non-stop</Text>
-              <SectionTitle>Listening queue</SectionTitle>
-            </View>
+        {/* ── SECTION: Non-stop listening ── */}
+        <SettingsSection
+          icon="play-circle-outline"
+          iconColor="#EF4444"
+          title="Non-stop Listening"
+          subtitle="Auto-queue TTS audio"
+          headerRight={
             <TogglePill
               active={nonStopEnabled}
               label={nonStopEnabled ? "On" : "Off"}
@@ -296,386 +246,612 @@ export default function SettingsTabScreen() {
                 void saveNonStopListeningEnabled(next);
               }}
             />
+          }
+        >
+          <View style={styles.preloadRow}>
+            <Text style={styles.preloadLabel}>Preload ahead</Text>
+            <View style={styles.segmentRow}>
+              {[1, 2, 3].map((count) => (
+                <Pressable
+                  key={count}
+                  onPress={() => { setNonStopPreloadCount(count); void saveNonStopPreloadCount(count); }}
+                  style={[styles.segmentBtn, nonStopPreloadCount === count && styles.segmentBtnActive]}
+                >
+                  <Text style={[styles.segmentBtnText, nonStopPreloadCount === count && styles.segmentBtnTextActive]}>
+                    {count}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
-          <BodyText>Pre-generate listening items and TTS audio so Play can continue until you stop it.</BodyText>
-          <View style={styles.segmentRow}>
-            {[1, 2, 3].map((count) => (
-              <Pressable
-                key={count}
-                onPress={() => {
-                  setNonStopPreloadCount(count);
-                  void saveNonStopPreloadCount(count);
-                }}
-                style={[styles.segmentButton, nonStopPreloadCount === count && styles.segmentButtonActive]}
-              >
-                <Text style={[styles.segmentText, nonStopPreloadCount === count && styles.segmentTextActive]}>{count} next</Text>
-              </Pressable>
+        </SettingsSection>
+
+        {/* ── SECTION: Offline sync ── */}
+        <SettingsSection
+          icon="sync-outline"
+          iconColor="#06B6D4"
+          title="Offline Sync"
+          subtitle="Pending changes queue"
+        >
+          <View style={styles.syncStats}>
+            {[
+              { label: "Total", value: pending.total },
+              { label: "Levels", value: pending.levelUpdates },
+              { label: "Practice", value: pending.practiceAttempts },
+            ].map((stat) => (
+              <View key={stat.label} style={styles.syncStat}>
+                <Text style={styles.syncStatValue}>{stat.value}</Text>
+                <Text style={styles.syncStatLabel}>{stat.label}</Text>
+              </View>
             ))}
           </View>
-        </View>
-
-        <View style={styles.panel}>
-          <View style={styles.sectionHead}>
-            <Text style={styles.eyebrow}>Queue</Text>
-            <SectionTitle>Offline sync</SectionTitle>
-            <BodyText>Pending changes flush when you are back online.</BodyText>
-          </View>
-          <View style={styles.syncStats}>
-            <View style={styles.syncStat}>
-              <Text style={styles.syncStatValue}>{pending.total}</Text>
-              <Text style={styles.syncStatLabel}>Total</Text>
-            </View>
-            <View style={styles.syncStat}>
-              <Text style={styles.syncStatValue}>{pending.levelUpdates}</Text>
-              <Text style={styles.syncStatLabel}>Levels</Text>
-            </View>
-            <View style={styles.syncStat}>
-              <Text style={styles.syncStatValue}>{pending.practiceAttempts}</Text>
-              <Text style={styles.syncStatLabel}>Practice</Text>
-            </View>
-          </View>
-          <PrimaryButton
-            disabled={!pending.total || !network.online}
+          <ActionRow
+            icon="cloud-upload-outline"
             label={pending.total ? "Retry pending sync" : "Nothing pending"}
-            onPress={async () => {
-              const next = await flushPendingSync();
-              setPending(next);
-            }}
+            disabled={!pending.total || !network.online}
+            onPress={async () => { const next = await flushPendingSync(); setPending(next); }}
+            hint={!network.online ? "Reconnect to flush the queue" : undefined}
+            isLast
           />
-          {!network.online ? (
-            <Text style={styles.feedbackMuted}>Reconnect to Wi‑Fi or cellular to flush the queue.</Text>
-          ) : null}
-        </View>
+        </SettingsSection>
 
-        <View style={styles.panel}>
-          <View style={styles.sectionHead}>
-            <Text style={styles.eyebrow}>Storage</Text>
-            <SectionTitle>Cache</SectionTitle>
-            <BodyText>Clear downloaded card images and TTS audio stored on device.</BodyText>
-          </View>
-          <View style={styles.cacheActions}>
-            <SecondaryButton
-              label="Clear image cache"
-              onPress={() => {
-                clearCardImageCache();
-                setCacheMessage("Image cache cleared.");
-              }}
-            />
-            <SecondaryButton
-              label="Clear audio cache"
-              onPress={() => {
-                clearAudioCache();
-                setCacheMessage("Audio cache cleared.");
-              }}
-            />
-          </View>
-          <Pressable
+        {/* ── SECTION: Storage ── */}
+        <SettingsSection
+          icon="folder-outline"
+          iconColor="#6B7280"
+          title="Storage & Cache"
+          subtitle="On-device cached files"
+        >
+          <ActionRow
+            icon="image-outline"
+            label="Clear image cache"
+            onPress={() => { clearCardImageCache(); setCacheMessage("Image cache cleared."); }}
+          />
+          <ActionRow
+            icon="musical-notes-outline"
+            label="Clear audio cache"
+            onPress={() => { clearAudioCache(); setCacheMessage("Audio cache cleared."); }}
+          />
+          <ToggleRow
+            icon="wifi-outline"
+            label="Audio downloads"
+            hint={audioWifiOnly ? "Wi‑Fi only" : "Any network"}
+            active={audioWifiOnly}
             onPress={() => {
               const next = !audioWifiOnly;
               setAudioWifiOnly(next);
               void saveAudioWifiOnly(next);
             }}
-            style={({ pressed }) => [styles.networkToggleRow, pressed && styles.networkToggleRowPressed]}
-          >
-            <View>
-              <Text style={styles.networkToggleTitle}>Audio downloads</Text>
-              <Text style={styles.networkToggleHint}>{audioWifiOnly ? "Wi‑Fi and ethernet only" : "Any network"}</Text>
-            </View>
-            <Text style={styles.networkToggleChevron}>›</Text>
-          </Pressable>
-          {cacheMessage ? <Text style={styles.feedbackOk}>{cacheMessage}</Text> : null}
-        </View>
-
-        <View style={[styles.panel, styles.panelDiagnostics]}>
-          <View style={styles.sectionHead}>
-            <Text style={styles.eyebrow}>QA</Text>
-            <SectionTitle>Diagnostics</SectionTitle>
-            <BodyText>Local error logs — no tokens are included.</BodyText>
-          </View>
-          <Text style={styles.diagCount}>{errors.length ? `${errors.length} entries` : "No entries"}</Text>
-          <SecondaryButton
-            label="Clear error logs"
-            onPress={async () => {
-              await clearClientErrors();
-              setErrors([]);
-            }}
+            isLast
           />
-        </View>
+          {cacheMessage ? <Text style={styles.feedbackOk}>{cacheMessage}</Text> : null}
+        </SettingsSection>
+
+        {/* ── SECTION: Diagnostics ── */}
+        <SettingsSection
+          icon="bug-outline"
+          iconColor="#9CA3AF"
+          title="Diagnostics"
+          subtitle={errors.length ? `${errors.length} error entries` : "No errors logged"}
+        >
+          <ActionRow
+            icon="trash-outline"
+            label="Clear error logs"
+            destructive
+            onPress={async () => { await clearClientErrors(); setErrors([]); }}
+            isLast
+          />
+        </SettingsSection>
+
+        <Text style={styles.versionNote}>Voca Mobile · Settings</Text>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+// ─── SettingsSection ──────────────────────────────────────────────────────────
+
+function SettingsSection({
+  icon, iconColor, title, subtitle, headerRight, children,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  iconColor: string;
+  title: string;
+  subtitle?: string;
+  headerRight?: ReactNode;
+  children: ReactNode;
+}) {
   return (
-    <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      {children}
+    <View style={styles.section}>
+      {/* Section header */}
+      <View style={styles.sectionHeader}>
+        <View style={[styles.sectionIconWrap, { backgroundColor: iconColor + "18" }]}>
+          <Ionicons name={icon} size={18} color={iconColor} />
+        </View>
+        <View style={styles.sectionHeaderText}>
+          <Text style={styles.sectionTitle}>{title}</Text>
+          {subtitle ? <Text style={styles.sectionSubtitle}>{subtitle}</Text> : null}
+        </View>
+        {headerRight ?? null}
+      </View>
+      {/* Section body */}
+      <View style={styles.sectionBody}>
+        {children}
+      </View>
     </View>
   );
 }
 
-function TogglePill({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
+// ─── InputRow ─────────────────────────────────────────────────────────────────
+
+function InputRow({
+  label, placeholder, value, onChangeText, secure, keyboardType, isLast,
+}: {
+  label: string;
+  placeholder?: string;
+  value: string;
+  onChangeText: (v: string) => void;
+  secure?: boolean;
+  keyboardType?: "url" | "default";
+  isLast?: boolean;
+}) {
+  const [pasted, setPasted] = useState(false);
+
+  async function handlePaste() {
+    const text = await Clipboard.getStringAsync();
+    if (text) {
+      onChangeText(text.trim());
+      setPasted(true);
+      setTimeout(() => setPasted(false), 1500);
+    }
+  }
+
   return (
-    <Pressable onPress={onPress} style={[styles.toggle, active && styles.toggleActive]}>
-      <Text style={[styles.toggleText, active && styles.toggleTextActive]} numberOfLines={1}>
-        {label}
-      </Text>
-    </Pressable>
+    <View style={[styles.fieldRow, isLast && styles.fieldRowLast]}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <View style={styles.inputWrap}>
+        <TextInput
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType={keyboardType ?? "default"}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={colors.mutedLight}
+          secureTextEntry={secure}
+          style={styles.inputInner}
+          value={value}
+        />
+        <Pressable onPress={handlePaste} style={styles.pasteIconBtn} hitSlop={8}>
+          <Ionicons
+            name={pasted ? "checkmark-circle" : "clipboard-outline"}
+            size={17}
+            color={pasted ? colors.accentStrong : colors.line}
+          />
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
-function VoicePicker({
-  sheetTitle,
-  value,
-  onChange,
+// ─── VoicePickerRow ───────────────────────────────────────────────────────────
+
+function VoicePickerRow({
+  label, sheetTitle, value, onChange, isLast,
 }: {
+  label: string;
   sheetTitle: string;
   value: string;
-  onChange: (value: string) => void;
+  onChange: (v: string) => void;
+  isLast?: boolean;
 }) {
   const [visible, setVisible] = useState(false);
   const progress = useRef(new Animated.Value(0)).current;
-  const selected = ttsVoiceOptions.find((opt) => opt.value === value);
+  const selected = ttsVoiceOptions.find((o) => o.value === value);
 
   useEffect(() => {
     if (!visible) return;
     progress.setValue(0);
-    Animated.timing(progress, {
-      toValue: 1,
-      duration: 220,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
+    Animated.timing(progress, { toValue: 1, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
   }, [progress, visible]);
 
   function close() {
-    Animated.timing(progress, {
-      toValue: 0,
-      duration: 160,
-      easing: Easing.in(Easing.cubic),
-      useNativeDriver: true,
-    }).start(({ finished }) => {
-      if (finished) setVisible(false);
-    });
+    Animated.timing(progress, { toValue: 0, duration: 160, easing: Easing.in(Easing.cubic), useNativeDriver: true })
+      .start(({ finished }) => { if (finished) setVisible(false); });
   }
 
   const backdropOpacity = progress.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
-  const sheetTransform = progress.interpolate({ inputRange: [0, 1], outputRange: [28, 0] });
+  const sheetY = progress.interpolate({ inputRange: [0, 1], outputRange: [28, 0] });
 
   return (
-    <View style={styles.voicePickerWrap}>
+    <>
       <Pressable
         onPress={() => setVisible(true)}
-        style={({ pressed }) => [styles.choiceTrigger, pressed && styles.choiceTriggerPressed]}
+        style={({ pressed }) => [styles.voiceRow, isLast && styles.fieldRowLast, pressed && styles.rowPressed]}
       >
-        <Text numberOfLines={2} style={styles.choiceTriggerText}>
-          {selected?.label ?? "Choose…"}
-        </Text>
-        <Text style={styles.choiceChevron}>›</Text>
+        <Text style={styles.fieldLabel}>{label}</Text>
+        <View style={styles.voiceValue}>
+          <Text numberOfLines={1} style={styles.voiceValueText}>{selected?.label ?? "Choose…"}</Text>
+          <Ionicons name="chevron-forward" size={14} color={colors.mutedLight} />
+        </View>
       </Pressable>
       <Modal animationType="none" transparent visible={visible} onRequestClose={close}>
         <Animated.View style={[styles.popupBackdrop, { opacity: backdropOpacity }]}>
-          <Pressable accessibilityRole="button" onPress={close} style={StyleSheet.absoluteFill} />
+          <Pressable onPress={close} style={StyleSheet.absoluteFill} />
         </Animated.View>
         <View pointerEvents="box-none" style={styles.popupLayer}>
-          <Animated.View style={[styles.popupSheet, { transform: [{ translateY: sheetTransform }] }]}>
+          <Animated.View style={[styles.popupSheet, { transform: [{ translateY: sheetY }] }]}>
             <View style={styles.popupHandle} />
             <View style={styles.popupHeader}>
               <Text style={styles.popupTitle}>{sheetTitle}</Text>
-              <Pressable accessibilityRole="button" onPress={close} style={styles.popupCloseButton}>
-                <Text style={styles.popupCloseText}>Close</Text>
+              <Pressable onPress={close} style={styles.popupCloseBtn}>
+                <Ionicons name="close" size={16} color={colors.muted} />
               </Pressable>
             </View>
-            <ScrollView
-              contentContainerStyle={styles.popupScrollContent}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-              style={styles.popupScroll}
-            >
+            <ScrollView contentContainerStyle={styles.popupList} showsVerticalScrollIndicator={false}>
               {ttsVoiceOptions.map((opt) => (
                 <Pressable
                   key={opt.value}
-                  onPress={() => {
-                    onChange(opt.value);
-                    close();
-                  }}
+                  onPress={() => { onChange(opt.value); close(); }}
                   style={[styles.popupItem, value === opt.value && styles.popupItemActive]}
                 >
                   <Text style={[styles.popupItemText, value === opt.value && styles.popupItemTextActive]}>{opt.label}</Text>
-                  {value === opt.value ? <Text style={styles.popupCheck}>✓</Text> : null}
+                  {value === opt.value ? <Ionicons name="checkmark" size={18} color={colors.accentStrong} /> : null}
                 </Pressable>
               ))}
             </ScrollView>
           </Animated.View>
         </View>
       </Modal>
+    </>
+  );
+}
+
+// ─── ActionRow ────────────────────────────────────────────────────────────────
+
+function ActionRow({
+  icon, label, onPress, disabled, destructive, hint, isLast,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  destructive?: boolean;
+  hint?: string;
+  isLast?: boolean;
+}) {
+  const color = destructive ? colors.danger : disabled ? colors.mutedLight : colors.accent;
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [styles.actionRow, isLast && styles.fieldRowLast, pressed && !disabled && styles.rowPressed]}
+    >
+      <Ionicons name={icon} size={16} color={color} />
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.actionLabel, { color }]}>{label}</Text>
+        {hint ? <Text style={styles.actionHint}>{hint}</Text> : null}
+      </View>
+      {!disabled && <Ionicons name="chevron-forward" size={14} color={colors.mutedLight} />}
+    </Pressable>
+  );
+}
+
+// ─── ToggleRow ────────────────────────────────────────────────────────────────
+
+function ToggleRow({
+  icon, label, hint, active, onPress, isLast,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  hint?: string;
+  active: boolean;
+  onPress: () => void;
+  isLast?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.actionRow, isLast && styles.fieldRowLast, pressed && styles.rowPressed]}
+    >
+      <Ionicons name={icon} size={16} color={colors.muted} />
+      <View style={{ flex: 1 }}>
+        <Text style={styles.actionLabel}>{label}</Text>
+        {hint ? <Text style={styles.actionHint}>{hint}</Text> : null}
+      </View>
+      <View style={[styles.toggleTrack, active && styles.toggleTrackActive]}>
+        <View style={[styles.toggleThumb, active && styles.toggleThumbActive]} />
+      </View>
+    </Pressable>
+  );
+}
+
+// ─── TogglePill ───────────────────────────────────────────────────────────────
+
+function TogglePill({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={[styles.togglePill, active && styles.togglePillActive]}>
+      <Text style={[styles.togglePillText, active && styles.togglePillTextActive]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+// ─── SaveRow ──────────────────────────────────────────────────────────────────
+
+function SaveRow({ isSaving, checkState, onPress }: { isSaving: boolean; checkState: CheckState; onPress: () => void }) {
+  return (
+    <View style={styles.saveRow}>
+      <Pressable
+        disabled={isSaving}
+        onPress={onPress}
+        style={({ pressed }) => [styles.saveBtn, isSaving && styles.saveBtnDisabled, pressed && styles.saveBtnPressed]}
+      >
+        {isSaving
+          ? <ActivityIndicator color="#fff" size="small" />
+          : <>
+              <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
+              <Text style={styles.saveBtnText}>Save &amp; test connection</Text>
+            </>}
+      </Pressable>
+      {checkState.message ? (
+        <Text style={[styles.checkMsg, checkState.status === "error" ? styles.checkMsgError : styles.checkMsgOk]}>
+          {checkState.message}
+        </Text>
+      ) : null}
     </View>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  safeRoot: { flex: 1, backgroundColor: colors.bg },
-  pageHeader: {
+  root: { flex: 1, backgroundColor: colors.bg },
+
+  // Header
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: colors.line,
-    paddingHorizontal: spacing.md,
+    borderBottomColor: colors.lineSoft,
+    paddingHorizontal: spacing.lg,
     paddingBottom: spacing.sm,
     backgroundColor: colors.panel,
+    ...shadows.sm,
   },
-  pageHeaderMain: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: spacing.md,
-  },
-  pageHeaderCopy: { flex: 1, minWidth: 0, gap: 3 },
-  pageTitle: { color: colors.ink, fontSize: 22, fontWeight: "900" },
-  pageSubtitle: { color: colors.muted, fontSize: 12, fontWeight: "800" },
-  scroll: { flex: 1 },
+  headerLeft: { flex: 1, gap: 2 },
+  pageTitle: { color: colors.ink, fontSize: 24, fontWeight: "900", letterSpacing: -0.5 },
+  pageSubtitle: { color: colors.muted, fontSize: 12, fontWeight: "600" },
+  loadingCenter: { flex: 1, alignItems: "center", justifyContent: "center" },
+
+  // Scroll
   scrollContent: {
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-    paddingBottom: 40,
+    paddingTop: spacing.lg,
+    paddingBottom: 60,
     gap: spacing.md,
     backgroundColor: colors.bg,
   },
-  loading: { flex: 1, alignItems: "center", justifyContent: "center" },
 
-  panel: {
-    gap: spacing.sm,
+  // Section card
+  section: {
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 14,
-    padding: spacing.md,
+    borderColor: colors.lineSoft,
     backgroundColor: colors.panel,
+    overflow: "hidden",
+    ...shadows.sm,
   },
-  panelDiagnostics: {
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.lineSoft,
     backgroundColor: colors.panelSoft,
   },
-  sectionHead: { gap: 6, marginBottom: 4 },
-  sectionHeadFlat: { flex: 1, minWidth: 0, gap: 4 },
-  eyebrow: {
-    color: colors.accentStrong,
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
+  sectionIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
   },
-  rowTitle: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: spacing.sm,
-    marginBottom: 4,
+  sectionHeaderText: { flex: 1, gap: 1 },
+  sectionTitle: { color: colors.ink, fontSize: 15, fontWeight: "800", letterSpacing: -0.2 },
+  sectionSubtitle: { color: colors.muted, fontSize: 11, fontWeight: "500" },
+  sectionBody: { gap: 0 },
+
+  // Field rows
+  fieldRow: {
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.lineSoft,
   },
-  field: { gap: 6 },
+  fieldRowLast: { borderBottomWidth: 0 },
+  fieldLabelRow: {},
   fieldLabel: {
     color: colors.muted,
     fontSize: 11,
-    fontWeight: "900",
+    fontWeight: "800",
     textTransform: "uppercase",
-    letterSpacing: 0.3,
+    letterSpacing: 0.4,
   },
-  input: {
-    minHeight: 48,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 12,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.panelSoft,
+  // Input with inline paste icon
+  inputWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: colors.lineSoft,
+    borderRadius: radius.md,
+    backgroundColor: colors.bg,
+    overflow: "hidden",
+  },
+  inputInner: {
+    flex: 1,
+    minHeight: 40,
+    paddingHorizontal: spacing.sm,
     color: colors.ink,
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: "600",
   },
-  feedback: { fontSize: 13, fontWeight: "800", lineHeight: 18 },
-  feedbackOk: { color: colors.accentStrong },
-  feedbackError: { color: colors.danger },
-  feedbackMuted: { color: colors.muted, fontSize: 13, fontWeight: "700" },
-  segmentRow: {
-    flexDirection: "row",
-    gap: spacing.xs,
-  },
-  segmentButton: {
-    flex: 1,
-    minHeight: 38,
-    alignItems: "center",
+  pasteIconBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 10,
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 999,
-    backgroundColor: colors.panelSoft,
+    alignItems: "center",
   },
-  segmentButtonActive: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accentSoft,
-  },
-  segmentText: {
-    color: colors.muted,
-    fontSize: 12,
-    fontWeight: "900",
-  },
-  segmentTextActive: {
-    color: colors.accentStrong,
-  },
-
-  toggle: {
-    maxWidth: "48%",
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 999,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 8,
-    backgroundColor: colors.panelSoft,
-    flexShrink: 0,
-  },
-  toggleActive: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accentSoft,
-  },
-  toggleText: {
-    color: colors.muted,
-    fontSize: 12,
-    fontWeight: "900",
-    textAlign: "center",
-  },
-  toggleTextActive: {
-    color: colors.accentStrong,
+  pasteBtn: {},
+  pasteBtnText: {},
+  pasteBtnTextDone: {},
+  input: {
+    minHeight: 40,
+    borderWidth: 1.5,
+    borderColor: colors.lineSoft,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.bg,
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "600",
   },
 
-  voicePickerWrap: { width: "100%" },
-  choiceTrigger: {
-    minHeight: 48,
+  // Voice picker row
+  voiceRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.lineSoft,
+  },
+  voiceValue: { flexDirection: "row", alignItems: "center", gap: 4 },
+  voiceValueText: { color: colors.ink, fontSize: 13, fontWeight: "700", maxWidth: 160 },
+
+  // Action row
+  actionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.lineSoft,
+  },
+  actionLabel: { color: colors.ink, fontSize: 14, fontWeight: "700" },
+  actionHint: { color: colors.mutedLight, fontSize: 11, fontWeight: "500", marginTop: 1 },
+  rowPressed: { backgroundColor: colors.panelSoft },
+
+  // iOS-style toggle switch
+  toggleTrack: {
+    width: 44,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: colors.line,
+    justifyContent: "center",
+    paddingHorizontal: 3,
+    flexShrink: 0,
+  },
+  toggleTrackActive: { backgroundColor: colors.accent },
+  toggleThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#fff",
+    ...shadows.sm,
+  },
+  toggleThumbActive: { alignSelf: "flex-end" },
+
+  // Toggle pill (header)
+  togglePill: {
+    borderRadius: radius.full,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 12,
+    backgroundColor: colors.panelSoft,
+    flexShrink: 0,
+  },
+  togglePillActive: { borderColor: colors.accentMid, backgroundColor: colors.accentSoft },
+  togglePillText: { color: colors.muted, fontSize: 11, fontWeight: "800" },
+  togglePillTextActive: { color: colors.accentStrong },
+
+  // Save button
+  saveRow: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: 6 },
+  saveBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    height: 44,
+    borderRadius: radius.md,
+    backgroundColor: colors.accent,
+    ...shadows.sm,
+  },
+  saveBtnDisabled: { opacity: 0.6 },
+  saveBtnPressed: { opacity: 0.85 },
+  saveBtnText: { color: "#fff", fontSize: 14, fontWeight: "900" },
+  checkMsg: { fontSize: 12, fontWeight: "700", textAlign: "center" },
+  checkMsgOk: { color: colors.accentStrong },
+  checkMsgError: { color: colors.danger },
+
+  // Non-stop preload
+  preloadRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: spacing.md,
-    paddingVertical: 10,
+    paddingVertical: 12,
+    gap: spacing.sm,
+  },
+  preloadLabel: { color: colors.ink, fontSize: 14, fontWeight: "700", flex: 1 },
+  segmentRow: { flexDirection: "row", gap: 6 },
+  segmentBtn: {
+    width: 40,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.line,
     backgroundColor: colors.panelSoft,
   },
-  choiceTriggerPressed: { opacity: 0.88 },
-  choiceTriggerText: {
+  segmentBtnActive: { borderColor: colors.accentMid, backgroundColor: colors.accentSoft },
+  segmentBtnText: { color: colors.muted, fontSize: 13, fontWeight: "900" },
+  segmentBtnTextActive: { color: colors.accentStrong },
+
+  // Sync stats
+  syncStats: {
+    flexDirection: "row",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingTop: 10,
+    paddingBottom: 4,
+  },
+  syncStat: {
     flex: 1,
-    color: colors.ink,
-    fontSize: 14,
-    fontWeight: "700",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.lineSoft,
+    backgroundColor: colors.panelSoft,
   },
-  choiceChevron: {
-    color: colors.muted,
-    fontSize: 20,
-    fontWeight: "300",
-  },
-  popupBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(10, 20, 17, 0.42)",
-  },
-  popupLayer: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
+  syncStatValue: { color: colors.ink, fontSize: 22, fontWeight: "900" },
+  syncStatLabel: { color: colors.muted, fontSize: 10, fontWeight: "700", textTransform: "uppercase", marginTop: 2 },
+
+  // Feedback
+  feedbackOk: { color: colors.accentStrong, fontSize: 12, fontWeight: "700", paddingHorizontal: spacing.md, paddingBottom: 8 },
+
+  // Popup sheet
+  popupBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(10,20,17,0.42)" },
+  popupLayer: { flex: 1, justifyContent: "flex-end" },
   popupSheet: {
     maxHeight: "75%",
     borderTopLeftRadius: 24,
@@ -683,111 +859,31 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     paddingTop: spacing.sm,
     backgroundColor: colors.panel,
-    shadowColor: "#000000",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: -10 },
     shadowOpacity: 0.12,
     shadowRadius: 24,
   },
-  popupHandle: {
-    width: 42,
-    height: 4,
-    alignSelf: "center",
-    borderRadius: 999,
-    backgroundColor: colors.line,
-    marginBottom: spacing.sm,
-  },
-  popupHeader: {
-    minHeight: 48,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: spacing.sm,
-  },
-  popupTitle: {
-    color: colors.ink,
-    fontSize: 18,
-    fontWeight: "900",
-    flex: 1,
-    marginRight: spacing.sm,
-  },
-  popupCloseButton: {
-    borderRadius: 999,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.panelSoft,
-  },
-  popupCloseText: {
-    color: colors.muted,
-    fontSize: 12,
-    fontWeight: "900",
-  },
-  popupScroll: { maxHeight: 400 },
-  popupScrollContent: { gap: spacing.xs, paddingBottom: spacing.md },
+  popupHandle: { width: 42, height: 4, alignSelf: "center", borderRadius: 99, backgroundColor: colors.line, marginBottom: spacing.sm },
+  popupHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.sm, minHeight: 44 },
+  popupTitle: { color: colors.ink, fontSize: 18, fontWeight: "900", flex: 1 },
+  popupCloseBtn: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: colors.panelSoft },
+  popupList: { gap: spacing.xs, paddingBottom: spacing.lg },
   popupItem: {
-    minHeight: 52,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 14,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.panelSoft,
+    minHeight: 50, flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    borderWidth: 1, borderColor: colors.line, borderRadius: 14,
+    paddingHorizontal: spacing.md, backgroundColor: colors.panelSoft,
   },
-  popupItemActive: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accentSoft,
-  },
-  popupItemText: {
-    flex: 1,
-    color: colors.ink,
-    fontSize: 14,
-    fontWeight: "800",
-    marginRight: spacing.sm,
-  },
-  popupItemTextActive: {
-    color: colors.accentStrong,
-    fontWeight: "900",
-  },
-  popupCheck: {
-    color: colors.accentStrong,
-    fontSize: 18,
-    fontWeight: "900",
-  },
+  popupItemActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  popupItemText: { flex: 1, color: colors.ink, fontSize: 14, fontWeight: "800", marginRight: spacing.sm },
+  popupItemTextActive: { color: colors.accentStrong },
 
-  syncStats: {
-    flexDirection: "row",
-    gap: spacing.sm,
+  // Footer
+  versionNote: {
+    textAlign: "center",
+    color: colors.mutedLight,
+    fontSize: 11,
+    fontWeight: "500",
+    marginTop: spacing.xs,
   },
-  syncStat: {
-    flex: 1,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.line,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xs,
-    backgroundColor: colors.panelSoft,
-    alignItems: "center",
-  },
-  syncStatValue: { color: colors.ink, fontSize: 20, fontWeight: "900" },
-  syncStatLabel: { color: colors.muted, fontSize: 10, fontWeight: "900", textTransform: "uppercase", marginTop: 2 },
-
-  cacheActions: { gap: spacing.xs },
-  networkToggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 12,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.panelSoft,
-  },
-  networkToggleRowPressed: { opacity: 0.88 },
-  networkToggleTitle: { color: colors.ink, fontSize: 15, fontWeight: "900" },
-  networkToggleHint: { color: colors.muted, fontSize: 12, fontWeight: "700", marginTop: 3 },
-  networkToggleChevron: { color: colors.muted, fontSize: 22, fontWeight: "300" },
-
-  diagCount: { color: colors.muted, fontSize: 14, fontWeight: "800" },
 });

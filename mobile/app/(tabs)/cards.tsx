@@ -1,12 +1,14 @@
 import { router, useFocusEffect } from "expo-router";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Animated, Easing, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View, type ViewStyle } from "react-native";
+import { ActivityIndicator, Animated, Easing, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ViewStyle } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { uniqueSortedValues, type CreatedDateFilter } from "@voca/core/data/search";
 import { AudioIconButton } from "../../src/audio";
 import { type MobileCard } from "../../src/cards";
+import { AddVocaModal } from "../../src/add-voca";
 import { useNetworkState } from "../../src/network";
-import { colors, spacing } from "../../src/theme";
+import { colors, radius, shadows, spacing } from "../../src/theme";
 import { Card, StatusPill } from "../../src/ui";
 import { defaultFilters, setCreatedDateFilter, useCards } from "../../src/useCards";
 
@@ -24,6 +26,7 @@ export default function CardsScreen() {
   const { cards, snapshot, loading, refreshing, error, offlineReady, filters, setFilters, reload, hydrateFromCache } = useCards();
   const network = useNetworkState();
   const [levelFilter, setLevelFilter] = useState("all");
+  const [addVocaOpen, setAddVocaOpen] = useState(false);
   const topics = useMemo(() => uniqueSortedValues(snapshot?.cards || [], "topic").slice(0, 8), [snapshot?.cards]);
   const topicOptions = useMemo(() => [allTopicOption, ...topics.map((topic) => ({ value: topic, label: topic }))], [topics]);
   const levelOptions = useMemo(() => levels.map((level) => ({ value: level, label: level === "all" ? "All levels" : level })), []);
@@ -31,6 +34,8 @@ export default function CardsScreen() {
     () => (levelFilter === "all" ? cards : cards.filter((card) => card.level === levelFilter)),
     [cards, levelFilter],
   );
+
+  const hasActiveFilters = filters.query || filters.topic !== "all" || levelFilter !== "all" || filters.createdDate !== "all";
 
   function clearFilters() {
     setFilters(defaultFilters);
@@ -45,6 +50,7 @@ export default function CardsScreen() {
 
   return (
     <SafeAreaView edges={[]} style={styles.safeRoot}>
+      {/* Sticky header */}
       <View style={[styles.pageHeader, { paddingTop: insets.top + spacing.xs }]}>
         <View style={styles.pageHeaderMain}>
           <View style={styles.pageHeaderCopy}>
@@ -53,9 +59,81 @@ export default function CardsScreen() {
               {visibleCards.length} visible · {snapshot?.cards.length || 0} total
             </Text>
           </View>
-          <StatusPill label={network.online ? network.label : "Offline"} tone={network.online ? "success" : "danger"} />
+          <View style={styles.headerActions}>
+            <Pressable
+              disabled={refreshing}
+              onPress={() => void reload()}
+              style={[styles.headerIconBtn, refreshing && styles.headerIconBtnDisabled]}
+            >
+              {refreshing
+                ? <ActivityIndicator color={colors.accent} size="small" />
+                : <Ionicons name="refresh-outline" size={18} color={colors.accent} />}
+            </Pressable>
+            <Pressable onPress={() => setAddVocaOpen(true)} style={styles.addBtn}>
+              <Ionicons name="add" size={18} color="#fff" />
+              <Text style={styles.addBtnText}>Add</Text>
+            </Pressable>
+          </View>
         </View>
+
+        {/* Compact search + filter row */}
+        <View style={styles.searchRow}>
+          <Ionicons name="search-outline" size={15} color={colors.muted} />
+          <TextInput
+            autoCapitalize="none"
+            autoCorrect={false}
+            onChangeText={(query) => setFilters({ ...filters, query })}
+            placeholder="Search words…"
+            placeholderTextColor={colors.mutedLight}
+            style={styles.search}
+            value={filters.query}
+          />
+          {filters.query ? (
+            <Pressable onPress={() => setFilters({ ...filters, query: "" })} hitSlop={8}>
+              <Ionicons name="close-circle" size={15} color={colors.muted} />
+            </Pressable>
+          ) : null}
+        </View>
+
+        {/* Horizontal scroll filter chips */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterChips}
+          style={styles.filterChipsScroll}
+        >
+          <FilterChip
+            label={levelFilter === "all" ? "Level" : levelFilter}
+            active={levelFilter !== "all"}
+            options={levelOptions}
+            value={levelFilter}
+            onChange={setLevelFilter}
+          />
+          <FilterChip
+            label={filters.topic === "all" ? "Topic" : filters.topic}
+            active={filters.topic !== "all"}
+            options={topicOptions}
+            value={filters.topic}
+            onChange={(topic) => setFilters({ ...filters, topic })}
+          />
+          <FilterChip
+            label={filters.createdDate === "all" ? "Date" : dateFilters.find(d => d.value === filters.createdDate)?.label || "Date"}
+            active={filters.createdDate !== "all"}
+            options={dateFilters}
+            value={filters.createdDate}
+            onChange={(createdDate) => setFilters(setCreatedDateFilter(filters, createdDate))}
+          />
+          {hasActiveFilters ? (
+            <Pressable onPress={clearFilters} style={styles.clearChip}>
+              <Ionicons name="close" size={11} color={colors.danger} />
+              <Text style={styles.clearChipText}>Clear</Text>
+            </Pressable>
+          ) : null}
+        </ScrollView>
+
+        {error ? <Text style={styles.error}>{error}</Text> : null}
       </View>
+
       <FlatList
         style={styles.list}
         contentContainerStyle={styles.screen}
@@ -63,45 +141,6 @@ export default function CardsScreen() {
         keyExtractor={(card) => card.id}
         ListHeaderComponent={
           <>
-            <View style={styles.filterShell}>
-              <View style={styles.searchRow}>
-                <Text style={styles.searchIcon}>⌕</Text>
-                <TextInput
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  onChangeText={(query) => setFilters({ ...filters, query })}
-                  placeholder="Search…"
-                  placeholderTextColor={colors.muted}
-                  style={styles.search}
-                  value={filters.query}
-                />
-              </View>
-              <View style={styles.filterToolbar}>
-                <FilterPopup
-                  label="Topic"
-                  options={topicOptions}
-                  value={filters.topic}
-                  onChange={(topic) => setFilters({ ...filters, topic })}
-                />
-                <FilterPopup label="Level" options={levelOptions} value={levelFilter} onChange={setLevelFilter} />
-                <FilterPopup
-                  label="Date"
-                  options={dateFilters}
-                  value={filters.createdDate}
-                  onChange={(createdDate) => setFilters(setCreatedDateFilter(filters, createdDate))}
-                />
-              </View>
-              <View style={styles.filterActions}>
-                <Pressable disabled={refreshing} onPress={() => void reload()} style={[styles.filterBtnPrimary, refreshing && styles.filterBtnDisabled]}>
-                  {refreshing ? <ActivityIndicator color="#ffffff" size="small" /> : <Text style={styles.filterBtnPrimaryText}>Refresh</Text>}
-                </Pressable>
-                <Pressable onPress={clearFilters} style={styles.filterBtnGhost}>
-                  <Text style={styles.filterBtnGhostText}>Clear</Text>
-                </Pressable>
-              </View>
-              {!network.online && offlineReady ? <Text style={styles.filterNote}>Offline — cached cards</Text> : null}
-              {error ? <Text style={styles.error}>{error}</Text> : null}
-            </View>
           {loading && !snapshot ? <ActivityIndicator color={colors.accent} /> : null}
           {!loading && !visibleCards.length ? (
             <Card>
@@ -115,6 +154,12 @@ export default function CardsScreen() {
         }
         renderItem={({ item }) => <CardRow card={item} />}
       />
+
+      <AddVocaModal
+        visible={addVocaOpen}
+        onClose={() => setAddVocaOpen(false)}
+        onCreated={() => void reload()}
+      />
     </SafeAreaView>
   );
 }
@@ -122,50 +167,80 @@ export default function CardsScreen() {
 function CardRow({ card }: { card: MobileCard }) {
   const hasPos = Boolean(card.partOfSpeech?.trim());
   const hasTopic = Boolean(card.topic?.trim());
+  const hasMeaningVi = Boolean(card.meaningVi?.trim());
+  const hasIpa = Boolean(card.pronunciation?.trim() || card.ipa?.trim());
+  const ipa = card.pronunciation || card.ipa || "";
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const levelConfig: Record<string, { stripe: string; dot: string; label: string }> = {
+    new:      { stripe: colors.levelNew,      dot: colors.levelNew,      label: "New" },
+    learning: { stripe: colors.levelLearning, dot: colors.levelLearning, label: "Learning" },
+    known:    { stripe: colors.levelKnown,    dot: colors.levelKnown,    label: "Known" },
+    mastered: { stripe: colors.levelMastered, dot: colors.levelMastered, label: "Mastered" },
+  };
+  const lc = levelConfig[card.level] ?? levelConfig.new;
+
   return (
     <Pressable
       onPress={() => router.push(`/cards/${encodeURIComponent(card.id)}`)}
-      style={({ pressed }) => [styles.cardRow, pressed && styles.cardRowPressed]}
+      onPressIn={() => Animated.spring(scaleAnim, { toValue: 0.97, useNativeDriver: true, speed: 50 }).start()}
+      onPressOut={() => Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, speed: 50 }).start()}
     >
-      <View style={[styles.cardStripe, styles[`cardStripe_${card.level}`]]} />
-      <View style={styles.cardMain}>
-        <View style={styles.cardHeaderRow}>
-          <Text numberOfLines={1} style={styles.word}>{card.word}</Text>
-          <Text style={[styles.levelPill, styles[`levelPill_${card.level}`], styles.levelPillNoShrink]}>{card.level}</Text>
-        </View>
-        {(hasPos || hasTopic) ? (
-          <View style={styles.cardMeta}>
-            {hasPos ? <Text numberOfLines={1} style={styles.posPill}>{card.partOfSpeech}</Text> : null}
-            {hasPos && hasTopic ? <Text style={styles.metaSep}>·</Text> : null}
-            {hasTopic ? <Text numberOfLines={1} style={styles.topic}>{card.topic}</Text> : null}
+      <Animated.View style={[styles.cardRow, { transform: [{ scale: scaleAnim }] }]}>
+        {/* Level stripe */}
+        <View style={[styles.cardStripe, { backgroundColor: lc.stripe }]} />
+
+        <View style={styles.cardMain}>
+          {/* Row 1: Word (big) + audio button */}
+          <View style={styles.cardTopRow}>
+            <Text numberOfLines={1} style={styles.word}>{card.word}</Text>
+            <AudioIconButton card={card} showError={false} />
           </View>
-        ) : null}
-        {card.tags.length ? (
-          <Text numberOfLines={1} style={styles.tagLine}>{card.tags.slice(0, 4).join(" · ")}</Text>
-        ) : null}
-      </View>
-      <View style={styles.cardActions}>
-        <AudioIconButton card={card} showError={false} />
-      </View>
+
+          {/* Row 2: Vietnamese meaning */}
+          {hasMeaningVi ? (
+            <Text numberOfLines={2} style={styles.meaningVi}>{card.meaningVi}</Text>
+          ) : null}
+
+          {/* Row 3: All meta in one line — POS · topic · IPA · level */}
+          <View style={styles.metaRow}>
+            {hasPos ? (
+              <Text numberOfLines={1} style={styles.posText}>{card.partOfSpeech}</Text>
+            ) : null}
+            {hasPos && hasTopic ? <Text style={styles.metaDot}>·</Text> : null}
+            {hasTopic ? (
+              <Text numberOfLines={1} style={styles.topicText}>{card.topic}</Text>
+            ) : null}
+            {(hasPos || hasTopic) && hasIpa ? <Text style={styles.metaDot}>·</Text> : null}
+            {hasIpa ? (
+              <Text numberOfLines={1} style={styles.ipaInline}>/{ipa}/</Text>
+            ) : null}
+            <View style={styles.metaSpacer} />
+            <View style={[styles.levelDot, { backgroundColor: lc.dot }]} />
+            <Text style={[styles.levelLabel, { color: lc.dot }]}>{lc.label}</Text>
+          </View>
+        </View>
+      </Animated.View>
     </Pressable>
   );
 }
-function FilterPopup<T extends string>({
+// ─── FilterChip ───────────────────────────────────────────────────────────────
+
+function FilterChip<T extends string>({
   label,
+  active,
   options,
-  style,
   value,
   onChange,
 }: {
   label: string;
+  active: boolean;
   options: Array<{ value: T; label: string }>;
-  style?: ViewStyle;
   value: T;
   onChange: (value: T) => void;
 }) {
   const [visible, setVisible] = useState(false);
   const progress = useRef(new Animated.Value(0)).current;
-  const selected = options.find((option) => option.value === value);
 
   useEffect(() => {
     if (!visible) return;
@@ -193,10 +268,17 @@ function FilterPopup<T extends string>({
   const sheetTransform = progress.interpolate({ inputRange: [0, 1], outputRange: [28, 0] });
 
   return (
-    <View style={[styles.dropdownWrap, style]}>
-      <Text style={styles.dropdownLabel}>{label}</Text>
-      <Pressable onPress={() => setVisible(true)} style={styles.dropdownButton}>
-        <Text numberOfLines={1} style={styles.dropdownValue}>{selected?.label || "All"}</Text>
+    <>
+      <Pressable
+        onPress={() => setVisible(true)}
+        style={[styles.filterChip, active && styles.filterChipActive]}
+      >
+        <Text style={[styles.filterChipText, active && styles.filterChipTextActive]} numberOfLines={1}>{label}</Text>
+        <Ionicons
+          name="chevron-down"
+          size={10}
+          color={active ? colors.accentStrong : colors.muted}
+        />
       </Pressable>
       <Modal animationType="none" transparent visible={visible} onRequestClose={close}>
         <Animated.View style={[styles.popupBackdrop, { opacity: backdropOpacity }]}>
@@ -208,7 +290,7 @@ function FilterPopup<T extends string>({
             <View style={styles.popupHeader}>
               <Text style={styles.popupTitle}>{label}</Text>
               <Pressable onPress={close} style={styles.popupCloseButton}>
-                <Text style={styles.popupCloseText}>Close</Text>
+                <Ionicons name="close" size={16} color={colors.muted} />
               </Pressable>
             </View>
             <View style={styles.popupOptions}>
@@ -222,104 +304,173 @@ function FilterPopup<T extends string>({
                   style={[styles.popupItem, value === option.value && styles.popupItemActive]}
                 >
                   <Text style={[styles.popupItemText, value === option.value && styles.popupItemTextActive]}>{option.label}</Text>
-                  {value === option.value ? <Text style={styles.popupCheck}>✓</Text> : null}
+                  {value === option.value ? <Ionicons name="checkmark" size={18} color={colors.accentStrong} /> : null}
                 </Pressable>
               ))}
             </View>
           </Animated.View>
         </View>
       </Modal>
-    </View>
+    </>
   );
+}
+
+// Legacy alias for compatibility
+function FilterPopup<T extends string>(props: Parameters<typeof FilterChip<T>>[0]) {
+  return <FilterChip {...props} />;
 }
 
 const styles = StyleSheet.create({
   safeRoot: { flex: 1, backgroundColor: colors.bg },
+
+  // ── Header ──────────────────────────────────────────────────────────────
   pageHeader: {
+    gap: spacing.xs,
     borderBottomWidth: 1,
-    borderBottomColor: colors.line,
-    paddingHorizontal: spacing.md,
+    borderBottomColor: colors.lineSoft,
+    paddingHorizontal: spacing.lg,
     paddingBottom: spacing.sm,
     backgroundColor: colors.panel,
+    ...shadows.sm,
   },
-  pageHeaderMain: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
-  pageHeaderCopy: { flex: 1, minWidth: 0, gap: 3 },
-  pageTitle: { color: colors.ink, fontSize: 22, fontWeight: "900" },
-  pageSubtitle: { color: colors.muted, fontSize: 12, fontWeight: "800" },
+  pageHeaderMain: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  pageHeaderCopy: { flex: 1, minWidth: 0, gap: 2 },
+  pageTitle: { color: colors.ink, fontSize: 24, fontWeight: "900", letterSpacing: -0.5 },
+  pageSubtitle: { color: colors.muted, fontSize: 12, fontWeight: "600" },
+
+  // Header action buttons
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  headerIconBtn: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.lineSoft,
+    backgroundColor: colors.panelSoft,
+  },
+  headerIconBtnDisabled: { opacity: 0.5 },
+  addBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    height: 36,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.full,
+    backgroundColor: colors.accent,
+    ...shadows.sm,
+  },
+  addBtnText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "900",
+    letterSpacing: 0.2,
+  },
+
+  // ── Search bar ─────────────────────────────────────────────────────────
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    minHeight: 38,
+    borderWidth: 1.5,
+    borderColor: colors.lineSoft,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.panelSoft,
+  },
+  search: {
+    flex: 1,
+    paddingVertical: 0,
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+
+  // ── Filter chips ────────────────────────────────────────────────────────
+  filterChipsScroll: { marginHorizontal: -spacing.lg },
+  filterChips: {
+    flexDirection: "row",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+  },
+  filterChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    height: 30,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.panelSoft,
+  },
+  filterChipActive: {
+    borderColor: colors.accentMid,
+    backgroundColor: colors.accentSoft,
+  },
+  filterChipText: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "800",
+    maxWidth: 80,
+  },
+  filterChipTextActive: {
+    color: colors.accentStrong,
+  },
+  clearChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    height: 30,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: "#f8b4b0",
+    backgroundColor: colors.dangerSoft,
+  },
+  clearChipText: {
+    color: colors.danger,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+
+  // ── List ────────────────────────────────────────────────────────────────
   list: { flex: 1 },
   screen: {
-    gap: spacing.md,
+    gap: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
     paddingBottom: 40,
     backgroundColor: colors.bg,
   },
-  filterShell: {
-    gap: spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 14,
-    padding: spacing.sm,
-    backgroundColor: colors.panel,
+  error: {
+    color: colors.danger,
+    fontSize: 12,
+    fontWeight: "700",
+    paddingHorizontal: spacing.xs,
   },
-  searchRow: {
-    minHeight: 40,
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 10,
-    paddingHorizontal: spacing.sm,
-    backgroundColor: colors.panelSoft,
-  },
-  searchIcon: {
-    color: colors.muted,
-    fontSize: 15,
+  emptyTitle: {
+    color: colors.ink,
+    fontSize: 16,
     fontWeight: "900",
   },
-  search: {
-    flex: 1,
-    minHeight: 40,
-    paddingVertical: 0,
-    paddingHorizontal: spacing.xs,
-    color: colors.ink,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  filterToolbar: {
-    flexDirection: "row",
-    gap: spacing.xs,
-  },
-  dropdownWrap: {
-    flex: 1,
-    minWidth: 0,
-    gap: 2,
-  },
-  dropdownLabel: {
+  note: {
     color: colors.muted,
-    fontSize: 9,
-    fontWeight: "900",
-    letterSpacing: 0.3,
-    textTransform: "uppercase",
+    fontSize: 13,
+    fontWeight: "500",
+    lineHeight: 19,
   },
-  dropdownButton: {
-    minHeight: 36,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 8,
-    paddingHorizontal: spacing.xs,
-    backgroundColor: colors.panelSoft,
-  },
-  dropdownValue: {
-    flex: 1,
-    textAlign: "center",
-    color: colors.ink,
-    fontSize: 11,
-    fontWeight: "800",
-  },
+
   popupBackdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(10, 20, 17, 0.42)",
@@ -402,208 +553,118 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "900",
   },
-  filterActions: {
-    flexDirection: "row",
-    gap: spacing.xs,
-    marginTop: 2,
-  },
-  filterBtnPrimary: {
-    flex: 1,
-    minHeight: 36,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 10,
-    backgroundColor: colors.accent,
-    paddingHorizontal: spacing.sm,
-  },
-  filterBtnPrimaryText: {
-    color: "#ffffff",
-    fontSize: 13,
-    fontWeight: "900",
-  },
-  filterBtnGhost: {
-    flex: 1,
-    minHeight: 36,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.panelSoft,
-    paddingHorizontal: spacing.sm,
-  },
-  filterBtnGhostText: {
-    color: colors.accentStrong,
-    fontSize: 13,
-    fontWeight: "900",
-  },
-  filterBtnDisabled: {
-    opacity: 0.55,
-  },
-  filterNote: {
-    color: colors.muted,
-    fontSize: 11,
-    fontWeight: "700",
-    lineHeight: 15,
-  },
-  note: {
-    color: colors.muted,
-    fontSize: 13,
-    fontWeight: "700",
-    lineHeight: 19,
-  },
-  error: {
-    color: colors.danger,
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  emptyTitle: {
-    color: colors.ink,
-    fontSize: 18,
-    fontWeight: "900",
-  },
   cardRow: {
-    minHeight: 88,
     flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "stretch",
-    width: "100%",
-    maxWidth: "100%",
-    gap: 0,
+    alignItems: "stretch",
     borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 14,
-    paddingVertical: spacing.md,
-    paddingRight: spacing.md,
-    paddingLeft: 0,
+    borderColor: colors.lineSoft,
+    borderRadius: radius.lg,
+    overflow: "hidden",
     backgroundColor: colors.panel,
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-  },
-  cardRowPressed: {
-    opacity: 0.92,
-    backgroundColor: colors.panelSoft,
+    ...shadows.sm,
   },
   cardStripe: {
     width: 4,
-    alignSelf: "stretch",
-    marginRight: spacing.sm,
-    borderTopRightRadius: 4,
-    borderBottomRightRadius: 4,
     flexShrink: 0,
-    backgroundColor: colors.accent,
-  },
-  cardStripe_new: {
-    backgroundColor: colors.muted,
-  },
-  cardStripe_learning: {
-    backgroundColor: "#d97706",
-  },
-  cardStripe_known: {
-    backgroundColor: colors.accentStrong,
-  },
-  cardStripe_mastered: {
-    backgroundColor: "#16a34a",
   },
   cardMain: {
     flex: 1,
     flexShrink: 1,
-    gap: 6,
-    justifyContent: "center",
     minWidth: 0,
-    paddingRight: spacing.xs,
+    paddingVertical: 10,
+    paddingLeft: spacing.sm,
+    paddingRight: spacing.sm,
+    gap: 3,
   },
-  cardHeaderRow: {
+
+  // Row 1: word + audio
+  cardTopRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
+    justifyContent: "space-between",
+    gap: spacing.xs,
     minWidth: 0,
-    width: "100%",
   },
   word: {
     flex: 1,
-    flexShrink: 1,
-    minWidth: 0,
     color: colors.ink,
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "900",
+    letterSpacing: -0.3,
   },
-  cardMeta: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    minWidth: 0,
-    width: "100%",
-  },
-  posPill: {
-    flexShrink: 1,
-    minWidth: 0,
-    overflow: "hidden",
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    backgroundColor: colors.panelSoft,
-    color: colors.ink,
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 0.4,
-    textTransform: "uppercase",
-  },
-  metaSep: {
-    flexShrink: 0,
-    color: colors.muted,
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  topic: {
-    flex: 1,
-    flexShrink: 1,
-    minWidth: 0,
-    color: colors.muted,
+
+  // Row 2: Vietnamese meaning
+  meaningVi: {
+    color: colors.accentStrong,
     fontSize: 13,
-    fontWeight: "800",
+    fontWeight: "600",
+    lineHeight: 18,
   },
-  levelPill: {
-    overflow: "hidden",
-    borderRadius: 999,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    backgroundColor: colors.panelSoft,
-    color: colors.accentStrong,
-    fontSize: 11,
-    fontWeight: "900",
-    textTransform: "uppercase",
-  },
-  levelPillNoShrink: {
-    flexShrink: 0,
-  },
-  levelPill_new: {
-    color: colors.muted,
-  },
-  levelPill_learning: {
-    backgroundColor: "#fff2d6",
-    color: "#9b5d00",
-  },
-  levelPill_known: {
-    backgroundColor: colors.accentSoft,
-    color: colors.accentStrong,
-  },
-  levelPill_mastered: {
-    backgroundColor: "#dcfce7",
-    color: "#166534",
-  },
-  tagLine: {
-    minWidth: 0,
-    color: colors.muted,
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  cardActions: {
+
+  // Row 3: compact meta
+  metaRow: {
     flexDirection: "row",
     alignItems: "center",
-    flexShrink: 0,
-    flexGrow: 0,
+    gap: 4,
+    flexWrap: "nowrap",
+    marginTop: 1,
   },
+  posText: {
+    color: colors.mutedLight,
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "capitalize",
+    flexShrink: 0,
+  },
+  topicText: {
+    color: colors.mutedLight,
+    fontSize: 11,
+    fontWeight: "500",
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  ipaInline: {
+    color: colors.mutedLight,
+    fontSize: 10,
+    fontStyle: "italic",
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  metaDot: {
+    color: colors.line,
+    fontSize: 10,
+    flexShrink: 0,
+  },
+  metaSpacer: { flex: 1 },
+  levelDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    flexShrink: 0,
+  },
+  levelLabel: {
+    fontSize: 10,
+    fontWeight: "800",
+    flexShrink: 0,
+    textTransform: "capitalize",
+  },
+
+  // Legacy compat
+  cardActions: {},
+  cardHeaderRow: {},
+  cardWordBlock: {},
+  ipa: {},
+  levelBadge: {},
+  levelBadgeText: {},
+  cardMeta: {},
+  posPill: {},
+  metaSep: {},
+  topic: {},
+  levelPill: {},
+  levelPillNoShrink: {},
+  levelPill_new: {},
+  levelPill_learning: {},
+  levelPill_known: {},
+  levelPill_mastered: {},
+  tagLine: {},
 });
