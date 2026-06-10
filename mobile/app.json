@@ -49,7 +49,15 @@
       "expo-router",
       "expo-secure-store",
       "./plugins/withIosExtensions",
-      "expo-speech-recognition"
+      "expo-speech-recognition",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.5"
+          }
+        }
+      ]
     ],
     "extra": {
       "router": {},
