@@ -1,9 +1,15 @@
 import * as Clipboard from "expo-clipboard";
 import * as ImagePicker from "expo-image-picker";
+import TextRecognition from "@react-native-ml-kit/text-recognition";
+import {
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent,
+} from "expo-speech-recognition";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   KeyboardAvoidingView,
   Modal,
@@ -92,33 +98,95 @@ async function getClipboardWord(): Promise<string> {
   }
 }
 
-// ─── OCR via Image Picker ─────────────────────────────────────────────────────
+// ─── OCR via ML Kit (on-device) ──────────────────────────────────────────────
 
 /**
- * Mở camera để chụp ảnh, sau đó dùng clipboard để lấy text (giả lập OCR flow).
- * Trong thực tế, có thể tích hợp VisionKit (iOS native) hoặc Google ML Kit.
- * Hiện tại: cho phép user chọn ảnh từ thư viện, nhắc user copy text từ ảnh.
+ * Chụp ảnh / chọn từ gallery → ML Kit text recognition on-device
+ * → trả về danh sách từ tiếng Anh phát hiện được.
  */
-async function pickImageForScan(): Promise<{ uri: string } | null> {
-  const { status } = await ImagePicker.requestCameraPermissionsAsync();
-  if (status !== "granted") {
-    // Try gallery as fallback
-    const galleryStatus = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (galleryStatus.status !== "granted") return null;
+async function pickAndScanImage(source: "camera" | "gallery"): Promise<string[]> {
+  let imageUri: string | null = null;
+
+  if (source === "camera") {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      const req = await ImagePicker.requestCameraPermissionsAsync();
+      if (req.status !== "granted") {
+        throw new Error("Quyền Camera bị từ chối.");
+      }
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.9,
+    });
+    if (!result.canceled && result.assets[0]) imageUri = result.assets[0].uri;
+  } else {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      const req = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (req.status !== "granted") {
+        throw new Error("Quyền truy cập thư viện ảnh bị từ chối.");
+      }
+    }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
+      quality: 0.9,
     });
-    if (result.canceled || !result.assets[0]) return null;
-    return { uri: result.assets[0].uri };
+    if (!result.canceled && result.assets[0]) imageUri = result.assets[0].uri;
   }
-  const result = await ImagePicker.launchCameraAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    quality: 0.8,
-  });
-  if (result.canceled || !result.assets[0]) return null;
-  return { uri: result.assets[0].uri };
+
+  if (!imageUri) return [];
+
+  // Chạy ML Kit OCR on-device
+  const recognized = await TextRecognition.recognize(imageUri);
+
+  const wordSet = new Set<string>();
+  const lowercasedSet = new Set<string>();
+
+  // Loại bỏ các stop words phổ biến trong tiếng Anh để gợi ý thông minh hơn
+  const stopWords = new Set([
+    "the", "and", "of", "to", "a", "an", "in", "is", "it", "you", "that", "he", "was", "for", "on",
+    "are", "as", "with", "his", "they", "i", "at", "be", "this", "have", "from", "or", "one", "had",
+    "by", "word", "but", "not", "what", "all", "were", "we", "when", "your", "can", "said", "there",
+    "use", "each", "which", "she", "do", "how", "their", "if", "will", "up", "other", "about",
+    "out", "many", "then", "them", "these", "so", "some", "her", "would", "make", "like", "him",
+    "into", "time", "has", "look", "two", "more", "write", "go", "see", "number", "no", "way",
+    "could", "people", "my", "than", "first", "water", "been", "call", "who", "oil", "its", "now",
+    "find"
+  ]);
+
+  for (const block of recognized.blocks) {
+    for (const line of block.lines) {
+      // 1. Phân tích từ đơn (tokens)
+      const tokens = line.text
+        .split(/\s+/)
+        .map((t) => t.replace(/[^a-zA-Z'\-]/g, "").trim())
+        .filter((t) => t.length >= 2 && /^[a-zA-Z]/.test(t));
+
+      for (const token of tokens) {
+        const lower = token.toLowerCase();
+        if (!stopWords.has(lower) && !lowercasedSet.has(lower)) {
+          lowercasedSet.add(lower);
+          wordSet.add(token); // Giữ casing ban đầu (ví dụ: JavaScript, iOS)
+        }
+      }
+
+      // 2. Phân tích nguyên dòng cụm từ (phrase)
+      const lineClean = line.text.replace(/[^a-zA-Z '\-]/g, " ").replace(/\s+/g, " ").trim();
+      if (lineClean.length >= 3 && lineClean.length <= 40) {
+        const lowerLine = lineClean.toLowerCase();
+        if (!stopWords.has(lowerLine) && !lowercasedSet.has(lowerLine)) {
+          lowercasedSet.add(lowerLine);
+          wordSet.add(lineClean);
+        }
+      }
+    }
+  }
+
+  // Giữ nguyên thứ tự đọc văn bản gốc từ trên xuống dưới
+  return Array.from(wordSet).slice(0, 20);
 }
+
 
 // ─── AddVocaForm ──────────────────────────────────────────────────────────────
 
@@ -135,6 +203,9 @@ export function AddVocaForm({
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [cards, setCards] = useState<MobileCard[]>([]);
   const [clipboardWord, setClipboardWord] = useState("");
+  // OCR
+  const [scanning, setScanning] = useState(false);
+  const [ocrWords, setOcrWords] = useState<string[]>([]);
 
   // Load cards cache for suggestions
   useEffect(() => {
@@ -181,14 +252,41 @@ export function AddVocaForm({
   }
 
   async function handleScan() {
-    const result = await pickImageForScan();
-    if (!result) return;
-    // After picking, check clipboard (user may have copied from photo)
-    const clip = await getClipboardWord();
-    if (clip && clip !== word) {
-      setWord(clip);
-    } else {
-      setError("Chụp xong, copy từ trong ảnh rồi nhấn 📋 để dán vào.");
+    Alert.alert(
+      "Chọn nguồn ảnh",
+      "Bạn muốn chụp ảnh mới hay chọn từ thư viện ảnh?",
+      [
+        {
+          text: "Chụp ảnh 📸",
+          onPress: () => void startScan("camera"),
+        },
+        {
+          text: "Chọn từ thư viện 🖼️",
+          onPress: () => void startScan("gallery"),
+        },
+        {
+          text: "Hủy",
+          style: "cancel",
+        },
+      ]
+    );
+  }
+
+  async function startScan(source: "camera" | "gallery") {
+    setScanning(true);
+    setError("");
+    setOcrWords([]);
+    try {
+      const words = await pickAndScanImage(source);
+      if (words.length === 0) {
+        setError("Không phát hiện được từ nào. Thử ảnh rõ hơn.");
+      } else {
+        setOcrWords(words);
+      }
+    } catch (scanError) {
+      setError(scanError instanceof Error ? scanError.message : "Scan thất bại. Thử lại.");
+    } finally {
+      setScanning(false);
     }
   }
 
@@ -234,8 +332,14 @@ export function AddVocaForm({
           {/* Mic icon — triggers iOS native voice dictation via TextInput */}
           <MicButton onResult={(text) => setWord(text)} />
           {/* Scan / Camera */}
-          <Pressable onPress={() => void handleScan()} style={styles.inputActionBtn}>
-            <Ionicons name="camera-outline" size={18} color={colors.muted} />
+          <Pressable
+            onPress={() => void handleScan()}
+            disabled={scanning}
+            style={[styles.inputActionBtn, scanning && styles.inputActionBtnActive]}
+          >
+            {scanning
+              ? <ActivityIndicator size="small" color={colors.accent} />
+              : <Ionicons name="camera-outline" size={18} color={colors.muted} />}
           </Pressable>
           {/* Clear */}
           {word.length > 0 ? (
@@ -246,7 +350,34 @@ export function AddVocaForm({
         </View>
       </View>
 
-      {/* Clipboard preview chip */}
+      {/* OCR word picker */}
+      {ocrWords.length > 0 ? (
+        <View style={styles.ocrResultBox}>
+          <View style={styles.ocrResultHeader}>
+            <Ionicons name="scan-outline" size={14} color={colors.accentStrong} />
+            <Text style={styles.ocrResultTitle}>Chọn từ để thêm</Text>
+            <Pressable onPress={() => setOcrWords([])} hitSlop={8}>
+              <Ionicons name="close" size={16} color={colors.muted} />
+            </Pressable>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.ocrWordList}
+          >
+            {ocrWords.map((w) => (
+              <Pressable
+                key={w}
+                onPress={() => { setWord(w); setOcrWords([]); }}
+                style={({ pressed }) => [styles.ocrWord, pressed && styles.ocrWordPressed]}
+              >
+                <Text style={styles.ocrWordText}>{w}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
+
       {clipboardWord && clipboardWord !== word ? (
         <Pressable onPress={() => void handlePasteClipboard()} style={styles.clipboardChip}>
           <Ionicons name="clipboard-outline" size={12} color={colors.accentStrong} />
@@ -304,50 +435,74 @@ export function AddVocaForm({
 // ─── Mic Button ───────────────────────────────────────────────────────────────
 
 /**
- * Kích hoạt voice dictation của iOS bằng cách focus một hidden TextInput
- * và trigger voice input programmatically. Trên Android hiển thị hint.
+ * Voice input dùng expo-speech-recognition (iOS SFSpeechRecognizer native).
+ * Real-time transcription, hỗ trợ English và tiếng Việt.
  */
 function MicButton({ onResult }: { onResult: (text: string) => void }) {
-  const hiddenInputRef = useRef<TextInput>(null);
   const [listening, setListening] = useState(false);
+  const [partialText, setPartialText] = useState("");
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
+  // Pulse animation khi đang nghe
   useEffect(() => {
-    if (!listening) return;
+    if (!listening) { pulseAnim.setValue(1); return; }
     const pulse = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.3, duration: 600, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.25, duration: 500, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
       ]),
     );
     pulse.start();
     return () => pulse.stop();
   }, [listening, pulseAnim]);
 
-  function startListening() {
+  // Listen for real-time partial results
+  useSpeechRecognitionEvent("result", (event) => {
+    const transcript = event.results[0]?.transcript ?? "";
+    if (event.isFinal) {
+      if (transcript.trim()) onResult(transcript.trim());
+      setListening(false);
+      setPartialText("");
+    } else {
+      setPartialText(transcript);
+    }
+  });
+
+  useSpeechRecognitionEvent("error", () => {
+    setListening(false);
+    setPartialText("");
+  });
+
+  useSpeechRecognitionEvent("end", () => {
+    setListening(false);
+    setPartialText("");
+  });
+
+  async function toggleListening() {
+    if (listening) {
+      ExpoSpeechRecognitionModule.stop();
+      setListening(false);
+      return;
+    }
+    const { granted } = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+    if (!granted) return;
     setListening(true);
-    // Focus hidden input — iOS will show voice dictation button in keyboard
-    setTimeout(() => hiddenInputRef.current?.focus(), 100);
+    ExpoSpeechRecognitionModule.start({
+      lang: "en-US",
+      interimResults: true,
+      continuous: false,
+    });
   }
 
   return (
     <>
-      {/* Hidden TextInput to capture voice input */}
-      <TextInput
-        ref={hiddenInputRef}
-        style={styles.hiddenInput}
-        onChangeText={(text) => {
-          if (text.trim()) {
-            onResult(text.trim());
-            setListening(false);
-          }
-        }}
-        onBlur={() => setListening(false)}
-        autoCorrect={false}
-        autoCapitalize="none"
-      />
+      {partialText ? (
+        <View style={styles.partialTextBubble}>
+          <Text style={styles.partialTextLabel} numberOfLines={1}>{partialText}</Text>
+        </View>
+      ) : null}
       <Pressable
-        onPress={startListening}
+        onPress={() => void toggleListening()}
         style={[styles.inputActionBtn, listening && styles.inputActionBtnActive]}
       >
         <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
@@ -495,11 +650,65 @@ const styles = StyleSheet.create({
   inputActionBtnActive: {
     backgroundColor: colors.accentSoft,
   },
-  hiddenInput: {
-    position: "absolute",
-    width: 1,
-    height: 1,
-    opacity: 0,
+  partialTextBubble: {
+    flex: 1,
+    paddingHorizontal: spacing.xs,
+    justifyContent: "center",
+  },
+  partialTextLabel: {
+    color: colors.accentStrong,
+    fontSize: 12,
+    fontWeight: "700",
+    fontStyle: "italic",
+  },
+
+  // OCR word picker
+  ocrResultBox: {
+    borderWidth: 1,
+    borderColor: colors.accentMid,
+    borderRadius: radius.lg,
+    backgroundColor: colors.accentSoft,
+    overflow: "hidden",
+  },
+  ocrResultHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.accentMid,
+  },
+  ocrResultTitle: {
+    flex: 1,
+    color: colors.accentStrong,
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+  },
+  ocrWordList: {
+    flexDirection: "row",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  ocrWord: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 7,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.accentMid,
+    backgroundColor: colors.panel,
+  },
+  ocrWordPressed: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  ocrWordText: {
+    color: colors.accentStrong,
+    fontSize: 13,
+    fontWeight: "700",
   },
 
   // Clipboard
