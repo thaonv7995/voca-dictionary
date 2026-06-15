@@ -40,27 +40,26 @@ async function withApiServer(fn, options = {}) {
   const origin = `http://127.0.0.1:${port}`;
   await mkdir(path.join(root, "cards"), { recursive: true });
   await mkdir(path.join(root, "audio"), { recursive: true });
-  await writeFile(path.join(root, "cards", "proposition.png"), "png");
+  const manifestCards = options.manifestCards || [
+    {
+      word: "proposition",
+      file: "proposition.png",
+      partOfSpeech: "noun",
+      topic: "Business / Negotiation",
+      tags: ["business / negotiation", "noun"],
+      createdAt: "2026-05-06T15:33:36+07:00",
+      level: "new",
+      pronunciation: "/ˌprɑːpəˈzɪʃən/",
+      ipa: "/ˌprɑːpəˈzɪʃən/",
+      meaningVi: "đề xuất, lời đề nghị",
+    },
+  ];
+  for (const card of manifestCards) {
+    await writeFile(path.join(root, "cards", card.file), "png");
+  }
   await writeFile(
     path.join(root, "cards.json"),
-    `${JSON.stringify(
-      [
-        {
-          word: "proposition",
-          file: "proposition.png",
-          partOfSpeech: "noun",
-          topic: "Business / Negotiation",
-          tags: ["business / negotiation", "noun"],
-          createdAt: "2026-05-06T15:33:36+07:00",
-          level: "new",
-          pronunciation: "/ˌprɑːpəˈzɪʃən/",
-          ipa: "/ˌprɑːpəˈzɪʃən/",
-          meaningVi: "đề xuất, lời đề nghị",
-        },
-      ],
-      null,
-      2,
-    )}\n`,
+    `${JSON.stringify(manifestCards, null, 2)}\n`,
   );
 
   const env = {
@@ -321,11 +320,64 @@ test("v1 API looks up cards by word and reflects request Origin in CORS", async 
     assert.equal(found.headers.get("access-control-allow-origin"), "https://reader.example.com");
     const foundPayload = await found.json();
     assert.equal(foundPayload.found, true);
+    assert.equal(foundPayload.matchType, "exact");
     assert.equal(foundPayload.card.id, "proposition");
     assert.equal(foundPayload.card.word, "proposition");
     assert.equal(foundPayload.card.meaningVi, "đề xuất, lời đề nghị");
     assert.equal(foundPayload.card.ipa, "/ˌprɑːpəˈzɪʃən/");
     assert.equal(foundPayload.card.audioUrl, "/v1/audio/proposition");
+    assert.equal(foundPayload.cards.length, 1);
+    assert.equal(foundPayload.cards[0].id, "proposition");
+  });
+});
+
+test("v1 API lookup supports partial token matches for multi-word cards", async () => {
+  await withApiServer(async ({ origin, token }) => {
+    const partial = await fetch(`${origin}/v1/cards/lookup?word=stems`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(partial.status, 200);
+    const partialPayload = await partial.json();
+    assert.equal(partialPayload.found, true);
+    assert.equal(partialPayload.matchType, "partial");
+    assert.ok(partialPayload.cards.some((card) => card.word === "stems from resistance"));
+    assert.equal(partialPayload.card.word, "stems from resistance");
+
+    const phrase = await fetch(`${origin}/v1/cards/lookup?word=stems from`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(phrase.status, 200);
+    const phrasePayload = await phrase.json();
+    assert.equal(phrasePayload.found, true);
+    assert.equal(phrasePayload.cards.length, 1);
+    assert.equal(phrasePayload.cards[0].word, "stems from resistance");
+  }, {
+    manifestCards: [
+      {
+        word: "proposition",
+        file: "proposition.png",
+        partOfSpeech: "noun",
+        topic: "Business / Negotiation",
+        tags: ["business / negotiation", "noun"],
+        createdAt: "2026-05-06T15:33:36+07:00",
+        level: "new",
+        pronunciation: "/ˌprɑːpəˈzɪʃən/",
+        ipa: "/ˌprɑːpəˈzɪʃən/",
+        meaningVi: "đề xuất, lời đề nghị",
+      },
+      {
+        word: "stems from resistance",
+        file: "stems-from-resistance.png",
+        partOfSpeech: "phrase",
+        topic: "General",
+        tags: ["phrase"],
+        createdAt: "2026-06-15T10:00:00+07:00",
+        level: "learning",
+        pronunciation: "",
+        ipa: "",
+        meaningVi: "bắt nguồn từ sự chống cự",
+      },
+    ],
   });
 });
 

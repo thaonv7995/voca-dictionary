@@ -36,22 +36,30 @@ GET /v1/health
 GET /v1/cards/lookup?word=abandon
 ```
 
-**200 — found:**
+**200 — found (exact or partial):**
 
 ```json
 {
   "found": true,
+  "word": "stems",
+  "matchType": "partial",
   "card": {
-    "id": "abandon",
-    "word": "abandon",
-    "meaningVi": "từ bỏ, bỏ rơi",
-    "ipa": "/əˈbændən/",
-    "pronunciation": "/əˈbændən/",
-    "audioUrl": "/v1/audio/abandon",
+    "id": "stems-from-resistance",
+    "word": "stems from resistance",
+    "meaningVi": "bắt nguồn từ sự chống cự",
+    "ipa": "",
+    "pronunciation": "",
+    "audioUrl": "/v1/audio/stems-from-resistance",
     "level": "learning"
-  }
+  },
+  "cards": [
+    { "id": "stems-from-resistance", "word": "stems from resistance", "meaningVi": "..." }
+  ]
 }
 ```
+
+`matchType` is `exact` when the query matches the full card word/slug/id, otherwise `partial`.
+Partial lookup matches when the query appears inside a card phrase or any query token matches a whole word in the card (e.g. `stems` → `stems from resistance`). Up to 8 cards are returned, best match first in `card` and `cards`.
 
 **200 — not found:**
 
@@ -65,7 +73,7 @@ GET /v1/cards/lookup?word=abandon
 { "error": { "code": "MISSING_WORD", "message": "Missing word query parameter." } }
 ```
 
-Lookup matches `word`, `slug`, or `id` (case-insensitive).
+Lookup matches `word`, `slug`, or `id` exactly (case-insensitive), then falls back to partial token/substring search across multi-word cards.
 
 ### List / sync cards
 

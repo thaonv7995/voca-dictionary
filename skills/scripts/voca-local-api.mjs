@@ -428,6 +428,50 @@ async function findCardById(cardId) {
   return { manifest, card };
 }
 
+const LOOKUP_MAX_RESULTS = 8;
+const LOOKUP_MIN_PARTIAL_LENGTH = 2;
+
+function tokenizeForLookup(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s'-]+/gu, " ")
+    .split(/\s+/)
+    .filter((token) => token.length > 0);
+}
+
+function scoreCardLookupMatch(card, query, queryTokens) {
+  const cardWord = String(card.word || "").toLowerCase();
+  const normalizedQuery = String(query || "").toLowerCase().trim();
+  const cardTokens = tokenizeForLookup(card.word);
+  if (!normalizedQuery) return 0;
+
+  if (cardWord === normalizedQuery) return 1000;
+  if (card.id === slugify(normalizedQuery) || card.slug === slugify(normalizedQuery)) return 990;
+  if (cardWord.startsWith(normalizedQuery)) return 800;
+  if (normalizedQuery.length >= LOOKUP_MIN_PARTIAL_LENGTH && cardWord.includes(normalizedQuery)) return 650;
+
+  const matchedTokens = queryTokens.filter((token) => cardTokens.includes(token));
+  if (matchedTokens.length === 0) return 0;
+  if (matchedTokens.length === queryTokens.length) {
+    return 420 + matchedTokens.length * 10;
+  }
+  return 300 + matchedTokens.length * 10;
+}
+
+async function findCardsByLookupQuery(word) {
+  const manifest = await readNormalizedManifest();
+  const query = String(word || "").trim();
+  const queryTokens = tokenizeForLookup(query);
+  if (!query) return [];
+
+  return manifest.cards
+    .map((card) => ({ card, score: scoreCardLookupMatch(card, query, queryTokens) }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || a.card.word.localeCompare(b.card.word))
+    .slice(0, LOOKUP_MAX_RESULTS)
+    .map((item) => item.card);
+}
+
 function lookupCardPayload(card) {
   const ipa = String(card.ipa || card.pronunciation || "").trim();
   return {
@@ -447,12 +491,33 @@ async function handleV1CardLookup(request, response, url) {
     sendApiError(request, response, 400, "MISSING_WORD", "Missing word query parameter.");
     return;
   }
-  const { card } = await findCardById(word);
-  if (!card) {
+  const { card: exactCard } = await findCardById(word);
+  if (exactCard) {
+    const cards = [lookupCardPayload(exactCard)];
+    sendJson(request, response, 200, {
+      found: true,
+      word,
+      matchType: "exact",
+      card: cards[0],
+      cards,
+    });
+    return;
+  }
+
+  const matches = await findCardsByLookupQuery(word);
+  if (matches.length === 0) {
     sendJson(request, response, 200, { found: false, word });
     return;
   }
-  sendJson(request, response, 200, { found: true, card: lookupCardPayload(card) });
+
+  const cards = matches.map(lookupCardPayload);
+  sendJson(request, response, 200, {
+    found: true,
+    word,
+    matchType: "partial",
+    card: cards[0],
+    cards,
+  });
 }
 
 async function findCachedAudioForCard(card) {
