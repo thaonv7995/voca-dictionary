@@ -32,20 +32,6 @@ const VOCA_API_TOKENS = String(process.env.VOCA_API_TOKEN || process.env.VOCA_AP
   .split(",")
   .map((token) => token.trim())
   .filter(Boolean);
-const BASE_ALLOWED_ORIGINS = [
-  "https://voca.thaonv.online",
-  "http://localhost:22052",
-  "http://127.0.0.1:22052",
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-  "http://localhost:4173",
-  "http://127.0.0.1:4173",
-];
-const EXTRA_ALLOWED_ORIGINS = String(process.env.VOCA_ALLOWED_ORIGINS || "")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-const ALLOWED_ORIGINS = new Set([...BASE_ALLOWED_ORIGINS, ...EXTRA_ALLOWED_ORIGINS]);
 const DOCKER_HOSTNAME = process.env.VOCA_DOCKER_HOSTNAME?.trim() || "host.docker.internal";
 const IS_DOCKER_RUNTIME =
   process.env.VOCA_FORCE_DOCKER_HOST_REWRITE === "1" ||
@@ -76,41 +62,51 @@ function isResolvedPathInsideDirectory(directory, resolvedCandidate) {
   return relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
 }
 
-function sendJson(request, response, status, payload) {
-  const requestOrigin = request.headers.origin;
-  const origin = ALLOWED_ORIGINS.has(requestOrigin) ? requestOrigin : "http://localhost:22052";
-  response.writeHead(status, {
-    "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Methods": "GET, HEAD, PATCH, POST, DELETE, OPTIONS",
+function corsOrigin(request) {
+  const requestOrigin = request.headers?.origin;
+  return requestOrigin && String(requestOrigin).trim() ? String(requestOrigin).trim() : "*";
+}
+
+function withCors(request, headers = {}) {
+  return {
+    "Access-Control-Allow-Origin": corsOrigin(request),
     "Access-Control-Allow-Headers": "Authorization, Content-Type",
-    "Content-Type": "application/json; charset=utf-8",
-  });
+    ...headers,
+  };
+}
+
+function sendJson(request, response, status, payload) {
+  response.writeHead(
+    status,
+    withCors(request, {
+      "Access-Control-Allow-Methods": "GET, HEAD, PATCH, POST, DELETE, OPTIONS",
+      "Content-Type": "application/json; charset=utf-8",
+    }),
+  );
   response.end(`${JSON.stringify(payload)}\n`);
 }
 
 function sendBinary(request, response, status, payload, contentType = "application/octet-stream") {
-  const requestOrigin = request.headers.origin;
-  const origin = ALLOWED_ORIGINS.has(requestOrigin) ? requestOrigin : "http://localhost:22052";
-  response.writeHead(status, {
-    "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Authorization, Content-Type",
-    "Cache-Control": "public, max-age=31536000, immutable",
-    "Content-Type": contentType,
-  });
+  response.writeHead(
+    status,
+    withCors(request, {
+      "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
+      "Cache-Control": "public, max-age=31536000, immutable",
+      "Content-Type": contentType,
+    }),
+  );
   response.end(payload);
 }
 
 function streamHeaders(request, response) {
-  const requestOrigin = request.headers.origin;
-  const origin = ALLOWED_ORIGINS.has(requestOrigin) ? requestOrigin : "http://localhost:22052";
-  response.writeHead(200, {
-    "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Authorization, Content-Type",
-    "Cache-Control": "no-store",
-    "Content-Type": "application/x-ndjson; charset=utf-8",
-  });
+  response.writeHead(
+    200,
+    withCors(request, {
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Cache-Control": "no-store",
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+    }),
+  );
 }
 
 function writeEvent(response, event) {
@@ -430,6 +426,33 @@ async function findCardById(cardId) {
     (item) => item.id === cardId || item.slug === cardId || item.slug === normalized || item.word.toLowerCase() === String(cardId).toLowerCase(),
   );
   return { manifest, card };
+}
+
+function lookupCardPayload(card) {
+  const ipa = String(card.ipa || card.pronunciation || "").trim();
+  return {
+    id: card.id,
+    word: card.word,
+    meaningVi: card.meaningVi || "",
+    ipa,
+    pronunciation: String(card.pronunciation || card.ipa || "").trim(),
+    audioUrl: card.audioUrl,
+    level: card.level,
+  };
+}
+
+async function handleV1CardLookup(request, response, url) {
+  const word = normalizeWord(url.searchParams.get("word") || "");
+  if (!word) {
+    sendApiError(request, response, 400, "MISSING_WORD", "Missing word query parameter.");
+    return;
+  }
+  const { card } = await findCardById(word);
+  if (!card) {
+    sendJson(request, response, 200, { found: false, word });
+    return;
+  }
+  sendJson(request, response, 200, { found: true, card: lookupCardPayload(card) });
 }
 
 async function findCachedAudioForCard(card) {
@@ -903,15 +926,14 @@ async function handleV1ChatCompletions(request, response) {
       return;
     }
     
-    const requestOrigin = request.headers.origin;
-    const origin = ALLOWED_ORIGINS.has(requestOrigin) ? requestOrigin : "http://localhost:22052";
-    response.writeHead(200, {
-      "Access-Control-Allow-Origin": origin,
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Authorization, Content-Type",
-      "Cache-Control": "no-store",
-      "Content-Type": "text/event-stream; charset=utf-8",
-    });
+    response.writeHead(
+      200,
+      withCors(request, {
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Cache-Control": "no-store",
+        "Content-Type": "text/event-stream; charset=utf-8",
+      }),
+    );
     
     const reader = upstream.body.getReader();
     const decoder = new TextDecoder();
@@ -946,14 +968,13 @@ async function handleV1ChatCompletions(request, response) {
     }
     
     const text = await upstream.text();
-    const requestOrigin = request.headers.origin;
-    const origin = ALLOWED_ORIGINS.has(requestOrigin) ? requestOrigin : "http://localhost:22052";
-    response.writeHead(upstream.status, {
-      "Access-Control-Allow-Origin": origin,
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Authorization, Content-Type",
-      "Content-Type": "application/json; charset=utf-8",
-    });
+    response.writeHead(
+      upstream.status,
+      withCors(request, {
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Content-Type": "application/json; charset=utf-8",
+      }),
+    );
     response.end(text);
   }
 }
@@ -1011,14 +1032,13 @@ async function handleV1RecordUsedWords(request, response) {
     
     await fs.writeFile(filePath, JSON.stringify(cache, null, 2), "utf8");
     
-    const requestOrigin = request.headers.origin;
-    const origin = ALLOWED_ORIGINS.has(requestOrigin) ? requestOrigin : "http://localhost:22052";
-    response.writeHead(200, {
-      "Access-Control-Allow-Origin": origin,
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Authorization, Content-Type",
-      "Content-Type": "application/json; charset=utf-8",
-    });
+    response.writeHead(
+      200,
+      withCors(request, {
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Content-Type": "application/json; charset=utf-8",
+      }),
+    );
     response.end(JSON.stringify({ success: true, count: Object.keys(cache.words).length }));
   } catch (error) {
     sendApiError(request, response, 500, "INTERNAL_ERROR", `Failed to record used words: ${error.message}`);
@@ -1184,6 +1204,10 @@ async function handleV1Request(request, response, url) {
   }
   if (request.method === "GET" && pathname === "/v1/cards") {
     await handleV1Cards(request, response, url);
+    return;
+  }
+  if (request.method === "GET" && pathname === "/v1/cards/lookup") {
+    await handleV1CardLookup(request, response, url);
     return;
   }
   if (request.method === "DELETE" && pathname === "/v1/cards") {

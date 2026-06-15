@@ -54,6 +54,8 @@ async function withApiServer(fn, options = {}) {
           createdAt: "2026-05-06T15:33:36+07:00",
           level: "new",
           pronunciation: "/ˌprɑːpəˈzɪʃən/",
+          ipa: "/ˌprɑːpəˈzɪʃən/",
+          meaningVi: "đề xuất, lời đề nghị",
         },
       ],
       null,
@@ -290,6 +292,40 @@ test("v1 API clears all cards and assets", async () => {
     // Verify MP3 is deleted
     const mp3Exists = await readFile(audioPath).then(() => true).catch(() => false);
     assert.equal(mp3Exists, false);
+  });
+});
+
+test("v1 API looks up cards by word and reflects request Origin in CORS", async () => {
+  await withApiServer(async ({ origin, token }) => {
+    const missing = await fetch(`${origin}/v1/cards/lookup`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(missing.status, 400);
+    assert.equal((await missing.json()).error.code, "MISSING_WORD");
+
+    const notFound = await fetch(`${origin}/v1/cards/lookup?word=missing-term`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(notFound.status, 200);
+    const notFoundPayload = await notFound.json();
+    assert.equal(notFoundPayload.found, false);
+    assert.equal(notFoundPayload.word, "missing-term");
+
+    const found = await fetch(`${origin}/v1/cards/lookup?word=Proposition`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Origin: "https://reader.example.com",
+      },
+    });
+    assert.equal(found.status, 200);
+    assert.equal(found.headers.get("access-control-allow-origin"), "https://reader.example.com");
+    const foundPayload = await found.json();
+    assert.equal(foundPayload.found, true);
+    assert.equal(foundPayload.card.id, "proposition");
+    assert.equal(foundPayload.card.word, "proposition");
+    assert.equal(foundPayload.card.meaningVi, "đề xuất, lời đề nghị");
+    assert.equal(foundPayload.card.ipa, "/ˌprɑːpəˈzɪʃən/");
+    assert.equal(foundPayload.card.audioUrl, "/v1/audio/proposition");
   });
 });
 

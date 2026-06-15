@@ -122,8 +122,11 @@ Các biến môi trường tùy chọn (có thể định nghĩa trong `.env`):
 - `VOCA_API_TOKEN` — Token bảo mật dùng để giao tiếp với API Bridge. Nếu để trống, hệ thống sẽ sử dụng token mặc định trong `@voca/core/auth/token`.
 - `VITE_VOCA_API_TOKEN` — Token dùng khi build web app. Nên đặt giá trị trùng với `VOCA_API_TOKEN`.
 - `EXPO_PUBLIC_VOCA_API_TOKEN` — Token cấu hình cho ứng dụng di động khi build. Nên đặt giá trị trùng với `VOCA_API_TOKEN`.
-- `VOCA_ALLOWED_ORIGINS` — Danh sách các domain trình duyệt bổ sung được phép gọi API Bridge (phân tách bằng dấu phẩy).
 - `VOCA_CARD_OUTPUT_DIR` — Thư mục xuất các ảnh thẻ từ vựng PNG trước khi đồng bộ vào `cards/` (Mặc định: `.voca-output/vocabulary_cards` trong thư mục gốc).
+
+Tích hợp API cho app bên ngoài (ví dụ bilingual-app): xem [docs/integration.md](docs/integration.md).
+
+CORS trên API Bridge phản chiếu header `Origin` của request — không cần cấu hình whitelist domain. Bảo mật dựa trên `VOCA_API_TOKEN`.
 
 ## Docker Compose (Web UI + API Bridge)
 
