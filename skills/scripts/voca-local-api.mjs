@@ -456,10 +456,9 @@ const STOP_WORDS = new Set([
   "yourselves"
 ]);
 
-function scoreCardLookupMatch(card, query, queryTokens) {
+function scoreCardLookupMatch(card, query) {
   const cardWord = String(card.word || "").toLowerCase();
   const normalizedQuery = String(query || "").toLowerCase().trim();
-  const cardTokens = tokenizeForLookup(card.word);
   if (!normalizedQuery) return 0;
 
   if (cardWord === normalizedQuery) return 1000;
@@ -467,27 +466,16 @@ function scoreCardLookupMatch(card, query, queryTokens) {
   if (cardWord.startsWith(normalizedQuery)) return 800;
   if (normalizedQuery.length >= LOOKUP_MIN_PARTIAL_LENGTH && cardWord.includes(normalizedQuery)) return 650;
 
-  const matchedTokens = queryTokens.filter((token) => cardTokens.includes(token));
-  if (matchedTokens.length === 0) return 0;
-
-  // Ignore matches that consist entirely of stop-words
-  const hasNonStopWord = matchedTokens.some((token) => !STOP_WORDS.has(token));
-  if (!hasNonStopWord) return 0;
-
-  if (matchedTokens.length === queryTokens.length) {
-    return 420 + matchedTokens.length * 10;
-  }
-  return 300 + matchedTokens.length * 10;
+  return 0;
 }
 
 async function findCardsByLookupQuery(word) {
   const manifest = await readNormalizedManifest();
   const query = String(word || "").trim();
-  const queryTokens = tokenizeForLookup(query);
   if (!query) return [];
 
   return manifest.cards
-    .map((card) => ({ card, score: scoreCardLookupMatch(card, query, queryTokens) }))
+    .map((card) => ({ card, score: scoreCardLookupMatch(card, query) }))
     .filter((item) => item.score > 0)
     .sort((a, b) => b.score - a.score || a.card.word.localeCompare(b.card.word))
     .slice(0, LOOKUP_MAX_RESULTS)
