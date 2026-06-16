@@ -431,12 +431,12 @@ async function findCardById(cardId) {
 const LOOKUP_MAX_RESULTS = 8;
 const LOOKUP_MIN_PARTIAL_LENGTH = 2;
 
-function tokenizeForLookup(value) {
+function cleanWordForComparison(value) {
   return String(value || "")
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s'-]+/gu, " ")
-    .split(/\s+/)
-    .filter((token) => token.length > 0);
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 const STOP_WORDS = new Set([
@@ -457,14 +457,14 @@ const STOP_WORDS = new Set([
 ]);
 
 function scoreCardLookupMatch(card, query) {
-  const cardWord = String(card.word || "").toLowerCase();
-  const normalizedQuery = String(query || "").toLowerCase().trim();
-  if (!normalizedQuery) return 0;
+  const cleanCardWord = cleanWordForComparison(card.word);
+  const cleanQuery = cleanWordForComparison(query);
+  if (!cleanQuery) return 0;
 
-  if (cardWord === normalizedQuery) return 1000;
-  if (card.id === slugify(normalizedQuery) || card.slug === slugify(normalizedQuery)) return 990;
-  if (cardWord.startsWith(normalizedQuery)) return 800;
-  if (normalizedQuery.length >= LOOKUP_MIN_PARTIAL_LENGTH && cardWord.includes(normalizedQuery)) return 650;
+  if (cleanCardWord === cleanQuery) return 1000;
+  if (card.id === slugify(cleanQuery) || card.slug === slugify(cleanQuery)) return 990;
+  if (cleanCardWord.startsWith(cleanQuery)) return 800;
+  if (cleanQuery.length >= LOOKUP_MIN_PARTIAL_LENGTH && cleanCardWord.includes(cleanQuery)) return 650;
 
   return 0;
 }
