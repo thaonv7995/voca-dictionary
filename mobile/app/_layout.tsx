@@ -56,6 +56,7 @@ export default function RootLayout() {
       <Stack.Screen name="agent/drills" options={{ title: "TOEIC drills" }} />
       <Stack.Screen name="agent/reading" options={{ title: "Reading" }} />
       <Stack.Screen name="agent/article" options={{ title: "Article Practice" }} />
+      <Stack.Screen name="agent/speaking" options={{ title: "Speaking Practice" }} />
       <Stack.Screen name="agent/conversation" options={{ headerShown: false }} />
       <Stack.Screen name="add-word" options={{ title: "Add vocabulary" }} />
     </Stack>

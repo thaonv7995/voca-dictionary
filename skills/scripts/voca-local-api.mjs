@@ -1312,7 +1312,7 @@ async function handleV1Request(request, response, url) {
     await handleV1GlobalStream(request, response, "assistant");
     return;
   }
-  const practiceMatch = pathname.match(/^\/v1\/practice\/(drills|reading|article|conversation)$/);
+  const practiceMatch = pathname.match(/^\/v1\/practice\/(drills|reading|article|conversation|speaking)$/);
   if (practiceMatch && request.method === "POST") {
     await handleV1GlobalStream(request, response, practiceMatch[1]);
     return;

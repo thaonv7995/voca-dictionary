@@ -1,5 +1,5 @@
 import { normalizeAnswer } from "./utils";
-import type { ArticlePractice, ChallengeDrill, QuickQuiz, ReadingContext } from "./types";
+import type { ArticlePractice, ChallengeDrill, QuickQuiz, ReadingContext, SpeakingPractice } from "./types";
 
 export type PracticeQualityReport = {
   score: number;
@@ -102,5 +102,17 @@ export function assessArticlePracticeQuality(article: ArticlePractice): Practice
     if (question.explanation.length < 40) issues.push("article explanation too thin");
   }
 
+  return { score: scoreFromIssues(issues.slice(0, 5)), issues };
+}
+
+export function assessSpeakingPracticeQuality(practice: SpeakingPractice): PracticeQualityReport {
+  const issues: string[] = [];
+  if (!practice.title) issues.push("missing title");
+  if (!practice.sentences || practice.sentences.length === 0) issues.push("missing sentences");
+  for (const sent of practice.sentences || []) {
+    if (!sent.text) issues.push("sentence text is empty");
+    if (!sent.ipa) issues.push("sentence ipa is empty");
+    if (!sent.words || sent.words.length === 0) issues.push("sentence has no words timing");
+  }
   return { score: scoreFromIssues(issues.slice(0, 5)), issues };
 }

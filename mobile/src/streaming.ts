@@ -2,7 +2,7 @@ import { loadCachedCards, type MobileCard } from "./cards";
 import { type ContextScope } from "./practice";
 import { llmSettingsPayload, loadApiSettings, normalizeBaseUrl } from "./settings";
 import { extractLlmDeltaText } from "@voca/core/data/llm";
-import { readingPrompt } from "@voca/core/practice/prompts";
+import { readingPrompt, speakingPrompt } from "@voca/core/practice/prompts";
 import type { ReadingFormat } from "@voca/core/practice/types";
 
 export async function streamVocaText(
@@ -135,6 +135,7 @@ function modeFromPath(path: string): string {
   if (path.includes("/drills")) return "drills";
   if (path.includes("/reading")) return "reading";
   if (path.includes("/article")) return "article";
+  if (path.includes("/speaking")) return "speaking";
   if (path.includes("/agent/card/")) return "card-assistant";
   return "assistant";
 }
@@ -349,6 +350,14 @@ function buildSystemPrompt({
       targetVocabularyIndex,
       selectedWord,
       readingFormat,
+      contextDescription(scope),
+      "No recorded practice mistakes yet.",
+    );
+  }
+  if (mode === "speaking") {
+    return speakingPrompt(
+      targetVocabularyIndex,
+      selectedWord,
       contextDescription(scope),
       "No recorded practice mistakes yet.",
     );

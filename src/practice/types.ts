@@ -96,7 +96,37 @@ export type ArticlePractice = {
   }[];
 };
 
-export type PracticeMode = "quiz" | "drill" | "reading" | "article";
+export type SpeakingWord = {
+  word: string;
+  ipa: string;
+  startMs: number;
+  endMs: number;
+};
+
+export type ConnectedSpeech = {
+  from: string;
+  to: string;
+  type: "linking" | "reduction" | "assimilation" | "elision";
+  symbol?: string;
+  explanation?: string;
+};
+
+export type SpeakingSentence = {
+  text: string;
+  ipa: string;
+  words: SpeakingWord[];
+  connectedSpeech: ConnectedSpeech[];
+};
+
+export type SpeakingPractice = {
+  type: "speaking_practice";
+  title: string;
+  topic?: string;
+  passageText: string;
+  sentences: SpeakingSentence[];
+};
+
+export type PracticeMode = "quiz" | "drill" | "reading" | "article" | "speaking";
 
 export type PracticeAttempt = {
   id: string;

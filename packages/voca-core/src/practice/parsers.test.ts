@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { maybeParseQuickQuiz, parseArticlePractice, parseDrillText, parseReadingContext } from "./parsers";
+import { maybeParseQuickQuiz, parseArticlePractice, parseDrillText, parseReadingContext, parseSpeakingPractice } from "./parsers";
 import { assessDrillBatchQuality, assessReadingQuality } from "./quality";
 
 describe("practice parsers", () => {
@@ -178,5 +178,51 @@ describe("practice parsers", () => {
 
     expect(article.targetWords).toEqual(["register", "notify", "submit"]);
     expect(article.questions).toHaveLength(3);
+  });
+
+  it("parses speaking practice sets", () => {
+    const practice = parseSpeakingPractice(
+      JSON.stringify({
+        type: "speaking_practice",
+        title: "Introduction Scene",
+        topic: "Introductions",
+        passageText: "Hello, my name is John. Nice to meet you.",
+        sentences: [
+          {
+            text: "Hello, my name is John.",
+            ipa: "həˈləʊ, maɪ neɪm ɪz ʤɒn.",
+            words: [
+              { word: "Hello", ipa: "həˈləʊ", startMs: 0, endMs: 500 },
+              { word: "my", ipa: "maɪ", startMs: 500, endMs: 800 },
+              { word: "name", ipa: "neɪm", startMs: 800, endMs: 1200 },
+              { word: "is", ipa: "ɪz", startMs: 1200, endMs: 1400 },
+              { word: "John", ipa: "ʤɒn", startMs: 1400, endMs: 2000 },
+            ],
+            connectedSpeech: [
+              { from: "name", to: "is", type: "linking", symbol: "‿", explanation: "Consonant to vowel" }
+            ]
+          },
+          {
+            text: "Nice to meet you.",
+            ipa: "naɪs tuː miːt juː.",
+            words: [
+              { word: "Nice", ipa: "naɪs", startMs: 2500, endMs: 3000 },
+              { word: "to", ipa: "tuː", startMs: 3000, endMs: 3300 },
+              { word: "meet", ipa: "miːt", startMs: 3300, endMs: 3700 },
+              { word: "you", ipa: "juː", startMs: 3700, endMs: 4200 },
+            ],
+            connectedSpeech: [
+              { from: "meet", to: "you", type: "assimilation", symbol: "‿", explanation: "/t/ + /j/ -> /tʃ/" }
+            ]
+          }
+        ]
+      })
+    );
+
+    expect(practice.title).toBe("Introduction Scene");
+    expect(practice.sentences).toHaveLength(2);
+    expect(practice.sentences[0].words).toHaveLength(5);
+    expect(practice.sentences[0].connectedSpeech).toHaveLength(1);
+    expect(practice.sentences[0].connectedSpeech[0].type).toBe("linking");
   });
 });

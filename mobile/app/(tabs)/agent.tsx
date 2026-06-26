@@ -4,10 +4,11 @@ import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, LayoutAnimation, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, UIManager, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { maybeParseQuickQuiz, parseArticlePractice, parseDrillText, parseReadingContext } from "@voca/core/practice/parsers";
-import type { ArticlePractice, ChallengeDrill, ReadingContext, ReadingDocumentType, ReadingFormat, ReadingQuestion } from "@voca/core/practice/types";
+import { maybeParseQuickQuiz, parseArticlePractice, parseDrillText, parseReadingContext, parseSpeakingPractice } from "@voca/core/practice/parsers";
+import type { ArticlePractice, ChallengeDrill, ReadingContext, ReadingDocumentType, ReadingFormat, ReadingQuestion, SpeakingPractice } from "@voca/core/practice/types";
 import { normalizeAnswer } from "@voca/core/practice/utils";
-import { TextAudioButton } from "../../src/audio";
+import { TextAudioButton, ensureTextAudio } from "../../src/audio";
+import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { loadCachedCards, loadCustomAgentCardIds, saveCustomAgentCardIds, type MobileCard } from "../../src/cards";
 import { type ContextScope } from "../../src/practice";
 import { llmSettingsPayload, loadApiSettings, normalizeBaseUrl } from "../../src/settings";
@@ -19,7 +20,7 @@ import { extractLlmResponseText } from "@voca/core/data/llm";
 
 type ScopeType = ContextScope["type"];
 type ChatMessage = { role: "user" | "assistant"; content: string; pending?: boolean };
-type AgentMode = "assistant" | "drills" | "reading" | "article";
+type AgentMode = "assistant" | "drills" | "reading" | "article" | "speaking";
 
 const cacheKeyPrefix = "voca.mobile.globalAgent.messages.";
 const suggestionKeyPrefix = "voca.mobile.globalAgent.suggestions.";
@@ -37,6 +38,7 @@ const agentModes = [
   { value: "drills", title: "Drills" },
   { value: "reading", title: "Reading" },
   { value: "article", title: "Articles" },
+  { value: "speaking", title: "Speaking" },
 ] as const;
 
 export default function AgentScreen() {
@@ -74,6 +76,13 @@ export default function AgentScreen() {
   const [articleStreaming, setArticleStreaming] = useState(false);
   const [articlePrefetching, setArticlePrefetching] = useState(false);
   const [articlePendingNext, setArticlePendingNext] = useState(false);
+  const [speakingPractice, setSpeakingPractice] = useState<SpeakingPractice | null>(null);
+  const [speakingQueue, setSpeakingQueue] = useState<SpeakingPractice[]>([]);
+  const [speakingHistory, setSpeakingHistory] = useState<SpeakingPractice[]>([]);
+  const [speakingError, setSpeakingError] = useState("");
+  const [speakingStreaming, setSpeakingStreaming] = useState(false);
+  const [speakingPrefetching, setSpeakingPrefetching] = useState(false);
+  const [speakingPendingNext, setSpeakingPendingNext] = useState(false);
   const [scopeType, setScopeType] = useState<ScopeType>("all");
   const [topic, setTopic] = useState("");
   const [level, setLevel] = useState("new");
@@ -168,6 +177,17 @@ export default function AgentScreen() {
     if (rest.length < 2) void generateArticlePractice({ background: true });
   }, [articlePendingNext, articleQueue, articlePractice]);
 
+  useEffect(() => {
+    if (!speakingPendingNext || !speakingQueue.length) return;
+    const [next, ...rest] = speakingQueue;
+    setSpeakingError("");
+    setSpeakingHistory((current) => (speakingPractice ? [...current, speakingPractice] : current));
+    setSpeakingPractice(next);
+    setSpeakingQueue(rest);
+    setSpeakingPendingNext(false);
+    if (rest.length < 2) void generateSpeakingPractice({ background: true });
+  }, [speakingPendingNext, speakingQueue, speakingPractice]);
+
   async function persistMessages(nextMessages: ChatMessage[]) {
     await AsyncStorage.setItem(cacheKey, JSON.stringify(nextMessages.filter((message) => !message.pending).slice(-30)));
   }
@@ -251,6 +271,11 @@ export default function AgentScreen() {
       setArticleAnswers({});
       setArticleChecked(false);
       setArticleError("");
+    } else if (activeMode === "speaking") {
+      setSpeakingPractice(null);
+      setSpeakingQueue([]);
+      setSpeakingHistory([]);
+      setSpeakingError("");
     }
   }
 
@@ -506,6 +531,70 @@ export default function AgentScreen() {
     setArticlePractice(previous);
   }
 
+  async function fetchSpeakingPractice() {
+    let raw = "";
+    const finalText = await streamVocaText(
+      "/v1/practice/speaking",
+      { message: practicePrompt("speaking"), contextScope },
+      (delta) => {
+        raw += delta;
+      },
+    );
+    return parseSpeakingPractice(finalText || raw);
+  }
+
+  async function generateSpeakingPractice({ background = false, preserveHistory = false } = {}) {
+    if (speakingStreaming || speakingPrefetching) return;
+    if (background) setSpeakingPrefetching(true);
+    else {
+      setSpeakingError("");
+      setSpeakingStreaming(true);
+    }
+    try {
+      const next = await fetchSpeakingPractice();
+      if (background) {
+        setSpeakingQueue((current) => [...current, next].slice(0, 3));
+        return;
+      }
+      if (preserveHistory) setSpeakingHistory((current) => (speakingPractice ? [...current, speakingPractice] : current));
+      setSpeakingPractice(next);
+      if (!preserveHistory) setSpeakingHistory([]);
+      if (speakingQueue.length < 2) void generateSpeakingPractice({ background: true });
+    } catch (generateError) {
+      if (!background) setSpeakingError(generateError instanceof Error ? generateError.message : "Cannot generate speaking practice.");
+    } finally {
+      if (background) setSpeakingPrefetching(false);
+      else {
+        setSpeakingPendingNext(false);
+        setSpeakingStreaming(false);
+      }
+    }
+  }
+
+  function nextSpeakingPractice() {
+    setSpeakingError("");
+    if (speakingQueue.length) {
+      const [next, ...rest] = speakingQueue;
+      setSpeakingHistory((current) => (speakingPractice ? [...current, speakingPractice] : current));
+      setSpeakingPractice(next);
+      setSpeakingQueue(rest);
+      if (rest.length < 2) void generateSpeakingPractice({ background: true });
+      return;
+    }
+    setSpeakingPendingNext(true);
+    if (speakingPrefetching) return;
+    void generateSpeakingPractice({ preserveHistory: true });
+  }
+
+  function previousSpeakingPractice() {
+    if (!speakingHistory.length) return;
+    setSpeakingError("");
+    const previous = speakingHistory[speakingHistory.length - 1];
+    setSpeakingHistory((current) => current.slice(0, -1));
+    if (speakingPractice) setSpeakingQueue((current) => [speakingPractice, ...current]);
+    setSpeakingPractice(previous);
+  }
+
   return (
     <SafeAreaView edges={[]} style={styles.root}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={0} style={styles.root}>
@@ -536,7 +625,7 @@ export default function AgentScreen() {
               />
             </View>
           </View>
-          {(activeMode === "assistant" ? streaming : activeMode === "drills" ? drillStreaming : activeMode === "reading" ? readingStreaming : articleStreaming) ? (
+          {(activeMode === "assistant" ? streaming : activeMode === "drills" ? drillStreaming : activeMode === "reading" ? readingStreaming : activeMode === "article" ? articleStreaming : speakingStreaming) ? (
             <View style={styles.loadingPill}>
               <ActivityIndicator color={colors.accentStrong} size="small" />
               <Text style={styles.loadingPillText}>Loading</Text>
@@ -620,7 +709,7 @@ export default function AgentScreen() {
             previousEnabled={readingHistory.length > 0}
             streaming={readingStreaming}
           />
-        ) : (
+        ) : activeMode === "article" ? (
           <ArticlePanel
             answers={articleAnswers}
             article={articlePractice}
@@ -643,6 +732,21 @@ export default function AgentScreen() {
             prefetching={articlePrefetching}
             previousEnabled={articleHistory.length > 0}
             streaming={articleStreaming}
+          />
+        ) : (
+          <SpeakingPanel
+            practice={speakingPractice}
+            error={speakingError}
+            onGenerate={() => void generateSpeakingPractice()}
+            onNext={nextSpeakingPractice}
+            onPrevious={previousSpeakingPractice}
+            onResetCurrent={() => {
+              animateNextLayout();
+            }}
+            pendingNext={speakingPendingNext}
+            prefetching={speakingPrefetching}
+            previousEnabled={speakingHistory.length > 0}
+            streaming={speakingStreaming}
           />
         )}
       </KeyboardAvoidingView>
@@ -883,6 +987,291 @@ function ArticlePanel({
     >
       {article ? <ArticlePracticeCard article={article} answers={answers} checked={checked} onCheck={onCheck} onSelect={onSelect} /> : null}
     </PracticeObjectPanel>
+  );
+}
+
+function SpeakingPanel({
+  practice,
+  streaming,
+  prefetching,
+  pendingNext,
+  error,
+  previousEnabled,
+  onGenerate,
+  onNext,
+  onPrevious,
+  onResetCurrent,
+}: {
+  practice: SpeakingPractice | null;
+  streaming: boolean;
+  prefetching: boolean;
+  pendingNext: boolean;
+  error: string;
+  previousEnabled: boolean;
+  onGenerate: () => void;
+  onNext: () => void;
+  onPrevious: () => void;
+  onResetCurrent: () => void;
+}) {
+  return (
+    <PracticeObjectPanel
+      emptyLabel="Generate"
+      error={error}
+      hasContent={Boolean(practice)}
+      onGenerate={onGenerate}
+      onNext={onNext}
+      onPrevious={onPrevious}
+      onResetCurrent={onResetCurrent}
+      pendingNext={pendingNext}
+      prefetching={prefetching}
+      previousEnabled={previousEnabled}
+      resetEnabled={Boolean(practice)}
+      streaming={streaming}
+      toolbarText="Practice speaking and shadowing (karaoke style) with IPA and timing."
+    >
+      {practice ? <SpeakingPracticeCard practice={practice} /> : null}
+    </PracticeObjectPanel>
+  );
+}
+
+function SpeakingPracticeCard({ practice }: { practice: SpeakingPractice }) {
+  const [shadowingEnabled, setShadowingEnabled] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progressMs, setProgressMs] = useState(0);
+  const [audioLoading, setAudioLoading] = useState(false);
+  const [playbackError, setPlaybackError] = useState("");
+
+  const player = useAudioPlayer(null);
+  const status = useAudioPlayerStatus(player);
+
+  const scrollRef = useRef<ScrollView>(null);
+  const sentenceOffsets = useRef<Record<number, number>>({});
+
+  const totalDurationMs = useMemo(() => {
+    if (!practice.sentences.length) return 0;
+    const lastSent = practice.sentences[practice.sentences.length - 1];
+    if (!lastSent.words.length) return 0;
+    return lastSent.words[lastSent.words.length - 1].endMs;
+  }, [practice]);
+
+  useEffect(() => {
+    player.muted = isMuted;
+    player.volume = isMuted ? 0 : 1;
+  }, [isMuted, player]);
+
+  async function togglePlay() {
+    if (isPlaying) {
+      if (shadowingEnabled) {
+        player.pause();
+      }
+      setIsPlaying(false);
+    } else {
+      if (shadowingEnabled) {
+        setAudioLoading(true);
+        setPlaybackError("");
+        try {
+          const source = await ensureTextAudio(practice.passageText);
+          player.replace({ uri: source.uri });
+          player.muted = isMuted;
+          player.volume = isMuted ? 0 : 1;
+          await player.seekTo(progressMs / 1000);
+          player.play();
+          setIsPlaying(true);
+        } catch (err) {
+          setPlaybackError(err instanceof Error ? err.message : "Failed to load audio.");
+          setIsPlaying(true);
+        } finally {
+          setAudioLoading(false);
+        }
+      } else {
+        setIsPlaying(true);
+      }
+    }
+  }
+
+  function handleStop() {
+    if (shadowingEnabled) {
+      player.pause();
+      void player.seekTo(0).catch(() => undefined);
+    }
+    setIsPlaying(false);
+    setProgressMs(0);
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  }
+
+  function handleShadowingToggle() {
+    if (isPlaying) {
+      player.pause();
+      setIsPlaying(false);
+    }
+    setShadowingEnabled(!shadowingEnabled);
+    setProgressMs(0);
+  }
+
+  useEffect(() => {
+    if (!isPlaying) return;
+
+    let animFrameId: number;
+    let lastTime = Date.now();
+
+    const tick = () => {
+      if (shadowingEnabled && player.currentStatus) {
+        const curMs = player.currentStatus.currentTime * 1000;
+        setProgressMs(curMs);
+        if (player.currentStatus.didJustFinish) {
+          setIsPlaying(false);
+          setProgressMs(0);
+          void player.seekTo(0).catch(() => undefined);
+        }
+      } else if (!shadowingEnabled) {
+        const now = Date.now();
+        const delta = now - lastTime;
+        lastTime = now;
+        setProgressMs((prev) => {
+          const next = prev + delta;
+          if (next >= totalDurationMs) {
+            setIsPlaying(false);
+            return 0;
+          }
+          return next;
+        });
+      }
+      animFrameId = requestAnimationFrame(tick);
+    };
+
+    animFrameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animFrameId);
+  }, [isPlaying, shadowingEnabled, totalDurationMs, player]);
+
+  const activeSentenceIdx = useMemo(() => {
+    for (let i = 0; i < practice.sentences.length; i++) {
+      const sent = practice.sentences[i];
+      if (!sent.words.length) continue;
+      const startMs = sent.words[0].startMs;
+      const endMs = sent.words[sent.words.length - 1].endMs;
+      if (progressMs >= startMs && progressMs <= endMs) {
+        return i;
+      }
+    }
+    return 0;
+  }, [practice.sentences, progressMs]);
+
+  useEffect(() => {
+    const y = sentenceOffsets.current[activeSentenceIdx];
+    if (y !== undefined) {
+      scrollRef.current?.scrollTo({ y: Math.max(0, y - 40), animated: true });
+    }
+  }, [activeSentenceIdx]);
+
+  return (
+    <View style={styles.speakingRoot}>
+      <View style={styles.speakingHeader}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.speakingTitle}>{practice.title}</Text>
+          {practice.topic ? <Text style={styles.speakingSub}>Topic: {practice.topic}</Text> : null}
+        </View>
+        {audioLoading && <ActivityIndicator color={colors.accent} size="small" />}
+      </View>
+
+      {playbackError ? <Text style={styles.error}>{playbackError}</Text> : null}
+
+      <View style={styles.speakingControls}>
+        <Pressable onPress={togglePlay} style={[styles.controlBtn, isPlaying && styles.controlBtnActive]}>
+          <Ionicons color={isPlaying ? colors.accentStrong : colors.ink} name={isPlaying ? "pause" : "play"} size={16} />
+          <Text style={[styles.controlBtnText, isPlaying && styles.controlBtnTextActive]}>
+            {isPlaying ? "Pause" : "Start"}
+          </Text>
+        </Pressable>
+
+        <Pressable onPress={handleStop} style={styles.controlBtn}>
+          <Ionicons color={colors.ink} name="square" size={16} />
+          <Text style={styles.controlBtnText}>Stop</Text>
+        </Pressable>
+
+        <Pressable onPress={handleShadowingToggle} style={[styles.controlBtn, shadowingEnabled && styles.controlBtnActive]}>
+          <Ionicons color={shadowingEnabled ? colors.accentStrong : colors.ink} name="headset" size={16} />
+          <Text style={[styles.controlBtnText, shadowingEnabled && styles.controlBtnTextActive]}>
+            {shadowingEnabled ? "Voice ON" : "Voice OFF"}
+          </Text>
+        </Pressable>
+
+        {shadowingEnabled && (
+          <Pressable onPress={() => setIsMuted(!isMuted)} style={[styles.controlBtn, !isMuted && styles.controlBtnActive]}>
+            <Ionicons color={!isMuted ? colors.accentStrong : colors.muted} name={isMuted ? "volume-mute" : "volume-high"} size={16} />
+            <Text style={[styles.controlBtnText, !isMuted && styles.controlBtnTextActive]}>
+              {isMuted ? "Muted" : "Sound"}
+            </Text>
+          </Pressable>
+        )}
+      </View>
+
+      <ScrollView
+        ref={scrollRef}
+        style={styles.scrollContainer}
+        contentContainerStyle={{ paddingBottom: 60 }}
+      >
+        {practice.sentences.map((sent, sentIdx) => {
+          const isActive = sentIdx === activeSentenceIdx;
+          return (
+            <View
+              key={sentIdx}
+              onLayout={(event) => {
+                sentenceOffsets.current[sentIdx] = event.nativeEvent.layout.y;
+              }}
+              style={[
+                styles.sentenceContainer,
+                isActive && styles.sentenceActive,
+              ]}
+            >
+              <View style={styles.speakingWordWrap}>
+                {sent.words.map((w, wIdx) => {
+                  const isWordActive = progressMs >= w.startMs && progressMs < w.endMs;
+                  const liaison = sent.connectedSpeech.find(
+                    (c) => c.from.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "") === w.word.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "")
+                  );
+
+                  return (
+                    <View
+                      key={wIdx}
+                      style={[
+                        styles.wordColumn,
+                        isWordActive && styles.wordColumnActive,
+                      ]}
+                    >
+                      <Text style={[styles.wordText, isWordActive && styles.wordTextActive]}>
+                        {w.word}
+                        {liaison && liaison.symbol ? (
+                          <Text style={styles.liaisonSymbol}>{liaison.symbol}</Text>
+                        ) : null}
+                      </Text>
+                      <Text style={[styles.wordIpa, isWordActive && styles.wordIpaActive]}>
+                        {w.ipa}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      {practice.sentences.some(s => s.connectedSpeech?.length > 0) && (
+        <View style={styles.linkingNotes}>
+          <Text style={styles.linkingNotesTitle}>Connected Speech (Luyện nối âm)</Text>
+          {practice.sentences.flatMap((s, sIdx) => s.connectedSpeech.map((c, cIdx) => (
+            <View key={`${sIdx}-${cIdx}`} style={styles.linkingNoteRow}>
+              <Ionicons color="#16a34a" name="link-outline" size={14} style={{ marginTop: 2 }} />
+              <Text style={styles.linkingNoteText}>
+                Đọc nối: "{c.from}" {c.symbol || "‿"} "{c.to}" ({c.type === "linking" ? "Nối âm" : c.type === "elision" ? "Nuốt âm" : c.type})
+                {c.explanation ? ` - ${c.explanation}` : ""}
+              </Text>
+            </View>
+          )))}
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -1270,6 +1659,7 @@ function isLikelyStructuredQuiz(value: string) {
 function practicePrompt(mode: Exclude<AgentMode, "assistant">, format?: ReadingFormat) {
   if (mode === "drills") return "Generate 3 TOEIC-style drills from my current vocabulary set.";
   if (mode === "reading") return `Generate one TOEIC ${format === "part6" ? "Part 6" : "Part 7"} reading practice set from my current vocabulary set.`;
+  if (mode === "speaking") return "Generate a speaking and shadowing practice task using my vocabulary set.";
   return "Generate an article practice task using my vocabulary set.";
 }
 
@@ -1512,4 +1902,29 @@ const styles = StyleSheet.create({
   feedbackWrong: { color: colors.danger },
   checkButton: { minHeight: 42, alignItems: "center", justifyContent: "center", borderRadius: 13, backgroundColor: colors.accent },
   checkButtonText: { color: "#ffffff", fontSize: 13, fontWeight: "900" },
+  speakingRoot: { gap: spacing.md, paddingVertical: spacing.xs },
+  speakingHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 1, borderBottomColor: colors.line, paddingBottom: spacing.sm },
+  speakingTitle: { color: colors.ink, fontSize: 16, fontWeight: "900" },
+  speakingSub: { color: colors.muted, fontSize: 12, fontWeight: "700" },
+  speakingControls: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.xs, borderWidth: 1, borderColor: colors.line, borderRadius: 14, padding: spacing.xs, backgroundColor: colors.panelSoft },
+  controlBtn: { flex: 1, minHeight: 38, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, borderWidth: 1, borderColor: colors.line, borderRadius: 999, backgroundColor: colors.panel },
+  controlBtnActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  controlBtnText: { color: colors.ink, fontSize: 10, fontWeight: "900" },
+  controlBtnTextActive: { color: colors.accentStrong, fontWeight: "900" },
+  scrollContainer: { minHeight: 250, maxHeight: 400, borderWidth: 1, borderColor: colors.line, borderRadius: 18, padding: spacing.md, backgroundColor: colors.panel },
+  sentenceContainer: { gap: spacing.sm, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.lineSoft },
+  sentenceActive: { backgroundColor: colors.panelSoft },
+  speakingWordWrap: { flexDirection: "row", flexWrap: "wrap", alignItems: "center" },
+  wordColumn: { alignItems: "center", marginRight: 8, marginBottom: 8, paddingHorizontal: 4, paddingVertical: 2, borderRadius: 6 },
+  wordColumnActive: { backgroundColor: colors.accentSoft },
+  wordText: { color: colors.ink, fontSize: 15, fontWeight: "700" },
+  wordTextActive: { color: colors.accentStrong, fontWeight: "900" },
+  wordIpa: { color: colors.muted, fontSize: 11, fontWeight: "700", marginTop: 2 },
+  wordIpaActive: { color: colors.accentStrong },
+  liaisonSymbol: { color: "#16a34a", fontSize: 15, fontWeight: "900", marginLeft: 1 },
+  sentenceIpaText: { color: colors.muted, fontSize: 12, fontWeight: "800", fontStyle: "italic", marginTop: 4 },
+  linkingNotes: { gap: spacing.xs, borderWidth: 1, borderColor: colors.line, borderRadius: 14, padding: spacing.sm, backgroundColor: colors.panelSoft, marginTop: spacing.xs },
+  linkingNotesTitle: { color: colors.ink, fontSize: 13, fontWeight: "900" },
+  linkingNoteRow: { flexDirection: "row", alignItems: "flex-start", gap: 5, paddingVertical: 2 },
+  linkingNoteText: { color: colors.ink, fontSize: 12, fontWeight: "700", flex: 1 },
 });

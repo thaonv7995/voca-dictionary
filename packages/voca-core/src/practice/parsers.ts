@@ -13,6 +13,7 @@ import type {
   ReadingContext,
   ReadingDocumentType,
   TrapType,
+  SpeakingPractice,
 } from "./types";
 
 const drillKinds = new Set<ChallengeDrillKind>([
@@ -313,5 +314,56 @@ export function parseArticlePractice(value: string): ArticlePractice {
       choices: stableShuffleItems(question.choices, `${parsed.title}:${question.answer}:${index}`),
     })),
     vocabularyNotes,
+  };
+}
+
+export function parseSpeakingPractice(value: string): SpeakingPractice {
+  const parsed = parseJsonObject<SpeakingPractice>(value);
+  if (parsed?.type !== "speaking_practice") {
+    throw new Error("Invalid speaking practice response");
+  }
+
+  const sentences = Array.isArray(parsed.sentences)
+    ? parsed.sentences
+        .map((sent) => {
+          const words = Array.isArray(sent.words)
+            ? sent.words.map((w) => ({
+                word: String(w.word || "").trim(),
+                ipa: String(w.ipa || "").trim(),
+                startMs: Number(w.startMs || 0),
+                endMs: Number(w.endMs || 0),
+              }))
+            : [];
+          const connectedSpeech = Array.isArray(sent.connectedSpeech)
+            ? sent.connectedSpeech.map((conn) => ({
+                from: String(conn.from || "").trim(),
+                to: String(conn.to || "").trim(),
+                type: (["linking", "reduction", "assimilation", "elision"].includes(conn.type)
+                  ? conn.type
+                  : "linking") as any,
+                symbol: conn.symbol ? String(conn.symbol).trim() : undefined,
+                explanation: conn.explanation ? String(conn.explanation).trim() : undefined,
+              }))
+            : [];
+          return {
+            text: String(sent.text || "").trim(),
+            ipa: String(sent.ipa || "").trim(),
+            words,
+            connectedSpeech,
+          };
+        })
+        .filter((sent) => sent.text && sent.words.length > 0)
+    : [];
+
+  if (!parsed.title || sentences.length === 0) {
+    throw new Error("Invalid speaking practice response");
+  }
+
+  return {
+    type: "speaking_practice",
+    title: String(parsed.title).trim(),
+    topic: parsed.topic ? String(parsed.topic).trim() : undefined,
+    passageText: parsed.passageText ? String(parsed.passageText).trim() : sentences.map((s) => s.text).join(" "),
+    sentences,
   };
 }

@@ -1,6 +1,6 @@
 import type { PracticeQualityReport } from "./quality";
 
-export type RevisePracticeKind = "drill_ndjson" | "reading_context" | "article_practice";
+export type RevisePracticeKind = "drill_ndjson" | "reading_context" | "article_practice" | "speaking_practice";
 
 export function revisePracticePrompt(kind: RevisePracticeKind, content: string, report: PracticeQualityReport): string {
   const targetShape =
@@ -8,7 +8,9 @@ export function revisePracticePrompt(kind: RevisePracticeKind, content: string, 
       ? "Return NDJSON only. Each line must be one drill object with kind, trapType, targetWord, testedSkill, difficulty, title, instruction, scenario, choices, answer, explanation, and whyWrong."
       : kind === "article_practice"
         ? "Return JSON only using the article_practice schema. Keep type, title, documentType, passage, targetWords, questions, and vocabularyNotes."
-        : "Return JSON only using the reading_context schema. Keep type, format, documentType, title, passage or documents, questions, and targetWords.";
+        : kind === "speaking_practice"
+          ? "Return JSON only using the speaking_practice schema. Keep type, title, topic, passageText, and sentences (each with text, ipa, words containing word/ipa/startMs/endMs, and connectedSpeech)."
+          : "Return JSON only using the reading_context schema. Keep type, format, documentType, title, passage or documents, questions, and targetWords.";
 
   return [
     "You are a TOEIC practice quality judge and reviser.",
