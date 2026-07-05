@@ -201,11 +201,17 @@ export function AudioPlayButton({ card }: { card: MobileCard }) {
   );
 }
 
-export function AudioIconButton({ card, showError = true }: { card: MobileCard; showError?: boolean }) {
+export function AudioIconButton({ card, showError = true, autoPlayTrigger = false }: { card: MobileCard; showError?: boolean; autoPlayTrigger?: boolean }) {
   const player = useAudioPlayer(null);
   const status = useAudioPlayerStatus(player);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (autoPlayTrigger) {
+      void play();
+    }
+  }, [autoPlayTrigger, card.id]);
 
   async function play() {
     setLoading(true);

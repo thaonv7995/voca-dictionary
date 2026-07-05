@@ -7,6 +7,7 @@ import { uniqueSortedValues, type CreatedDateFilter } from "@voca/core/data/sear
 import { AudioIconButton } from "../../src/audio";
 import { type MobileCard } from "../../src/cards";
 import { AddVocaModal } from "../../src/add-voca";
+import { FlashcardModal } from "../../src/FlashcardModal";
 import { useNetworkState } from "../../src/network";
 import { colors, radius, shadows, spacing } from "../../src/theme";
 import { Card, StatusPill } from "../../src/ui";
@@ -27,6 +28,7 @@ export default function CardsScreen() {
   const network = useNetworkState();
   const [levelFilter, setLevelFilter] = useState("all");
   const [addVocaOpen, setAddVocaOpen] = useState(false);
+  const [flashcardOpen, setFlashcardOpen] = useState(false);
   const topics = useMemo(() => uniqueSortedValues(snapshot?.cards || [], "topic").slice(0, 8), [snapshot?.cards]);
   const topicOptions = useMemo(() => [allTopicOption, ...topics.map((topic) => ({ value: topic, label: topic }))], [topics]);
   const levelOptions = useMemo(() => levels.map((level) => ({ value: level, label: level === "all" ? "All levels" : level })), []);
@@ -68,6 +70,9 @@ export default function CardsScreen() {
               {refreshing
                 ? <ActivityIndicator color={colors.accent} size="small" />
                 : <Ionicons name="refresh-outline" size={18} color={colors.accent} />}
+            </Pressable>
+            <Pressable onPress={() => setFlashcardOpen(true)} style={[styles.headerIconBtn, { marginRight: 8 }]}>
+              <Ionicons name="albums-outline" size={18} color={colors.accent} />
             </Pressable>
             <Pressable onPress={() => setAddVocaOpen(true)} style={styles.addBtn}>
               <Ionicons name="add" size={18} color="#fff" />
@@ -159,6 +164,14 @@ export default function CardsScreen() {
         visible={addVocaOpen}
         onClose={() => setAddVocaOpen(false)}
         onCreated={() => void reload()}
+      />
+      <FlashcardModal
+        visible={flashcardOpen}
+        cards={visibleCards}
+        onClose={() => setFlashcardOpen(false)}
+        onLevelChange={(card, level) => {
+          // It's handled inside the modal by patchCardLevel, we can just let it reload on blur
+        }}
       />
     </SafeAreaView>
   );
