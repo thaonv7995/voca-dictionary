@@ -1604,6 +1604,12 @@ const server = createServer(async (request, response) => {
     return;
   }
 
+  // Legacy (pre-/v1/) POST routes below spend LLM/TTS credits and write into the
+  // repo, so they need the same bearer check handleV1Request already applies.
+  // /audio/ above stays open: it is played through <audio src>, which cannot
+  // send an Authorization header.
+  if (!requireVocaApiToken(request, response)) return;
+
   if (request.method === "POST" && request.url === "/tts-cache") {
     try {
       await handleTtsCache(request, response);
