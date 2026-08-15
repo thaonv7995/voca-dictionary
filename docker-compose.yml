@@ -18,7 +18,7 @@ services:
       dockerfile: docker/Dockerfile.bridge
     container_name: voca-dictionary-bridge
     ports:
-      - "0.0.0.0:22053:22053"
+      - "127.0.0.1:22053:22053"
     environment:
       VOCA_API_TOKEN: ${VOCA_API_TOKEN:-}
       VOCA_API_TOKENS: ${VOCA_API_TOKENS:-}
